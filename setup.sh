@@ -1047,14 +1047,22 @@ collect_user_input() {
         info "Found existing configuration, using previous values as defaults"
     fi
 
-    # Prompt for GitHub username
+    # Detect GitHub username automatically from gh CLI, fall back to config/prompt
     local default_github_user=""
-    if [[ -n "$existing_config" ]]; then
+    if gh auth status &>/dev/null; then
+        default_github_user=$(gh api user --jq '.login' 2>/dev/null || echo "")
+    fi
+    if [[ -z "$default_github_user" ]] && [[ -n "$existing_config" ]]; then
         default_github_user=$(echo "$existing_config" | jq -r '.githubUser // ""')
     fi
 
-    read -p "GitHub username${default_github_user:+ [$default_github_user]}: " -r github_user
-    github_user="${github_user:-$default_github_user}"
+    local github_user=""
+    if [[ -n "$default_github_user" ]]; then
+        info "Detected GitHub username: $default_github_user"
+        github_user="$default_github_user"
+    else
+        read -p "GitHub username: " -r github_user
+    fi
 
     # Validate GitHub username (alphanumeric, hyphens, non-empty)
     if ! [[ "$github_user" =~ ^[a-zA-Z0-9-]+$ && -n "$github_user" ]]; then
@@ -1069,7 +1077,23 @@ collect_user_input() {
         default_project_dirs=$(echo "$existing_config" | jq '.projectDirs')
     fi
 
-    info "Enter project directory paths (one per line, empty line to finish)"
+    info "Enter Mac directories to mount into the container (read-write)."
+    info "These are folders on your Mac where you keep code (e.g., ~/Projects)."
+    echo ""
+    warn "WARNING: Claude Code agents will have FULL READ-WRITE access to these"
+    warn "directories and can modify or delete any file in them at any time."
+    warn "Do NOT mount folders containing personal data, API keys, credentials,"
+    warn "or anything you are not prepared to lose."
+    echo ""
+    if ! ask_yn "I understand the risk — continue?"; then
+        info "No project directories will be mounted."
+        project_dirs=()
+        # Skip the directory entry loop
+        local skip_dirs=true
+    fi
+
+    if [[ "${skip_dirs:-}" != "true" ]]; then
+    info "One path per line, empty line to finish."
     [[ "$default_project_dirs" != "[]" ]] && info "Previous paths: $(echo "$default_project_dirs" | jq -r '.[]' | tr '\n' ', ' | sed 's/,$//')"
 
     local project_dirs=()
@@ -1100,6 +1124,7 @@ collect_user_input() {
         done < <(echo "$default_project_dirs" | jq -r '.[]')
         info "Using previous project directories"
     fi
+    fi  # end skip_dirs check
 
     # Distro selection menu - currently supports apt-based distros only
     # Note: Multi-distro support (Fedora, Alpine) is planned for a future version.
