@@ -6,8 +6,7 @@ set -euo pipefail
 echo "Installing psford Personal Development Tools..."
 
 # Step 1: Detect package manager
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-DETECT_SCRIPT="$(cd "${SCRIPT_DIR}/../.." && pwd)/detect-package-manager.sh"
+DETECT_SCRIPT="/usr/local/bin/detect-package-manager.sh"
 
 if [ ! -f "$DETECT_SCRIPT" ]; then
     echo "Error: detect-package-manager.sh not found at ${DETECT_SCRIPT}"
@@ -26,9 +25,8 @@ if [ "${INSTALLAZURECLI}" = "true" ]; then
     echo "Installing Azure CLI..."
     case "${PKG_MANAGER}" in
         apt)
-            apt-get update
-            apt-get install -y azure-cli || {
-                echo "Warning: Failed to install azure-cli via apt"
+            curl -sL https://aka.ms/InstallAzureCLIDeb | bash || {
+                echo "Warning: Failed to install azure-cli via official script"
             }
             ;;
         dnf)
@@ -60,7 +58,7 @@ fi
 # Step 3: Install Python dependencies
 echo "Installing Python dependencies for helpers..."
 pip3 install --upgrade pip || true
-pip3 install slack-bolt slack-sdk requests anthropic || {
+pip3 install --break-system-packages slack-bolt slack-sdk requests anthropic || {
     echo "Warning: Some Python dependencies may not have installed successfully"
 }
 

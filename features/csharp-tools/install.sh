@@ -6,8 +6,7 @@ set -euo pipefail
 echo "Installing C# / .NET Development Tools..."
 
 # Step 1: Detect package manager
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-DETECT_SCRIPT="$(cd "${SCRIPT_DIR}/../.." && pwd)/detect-package-manager.sh"
+DETECT_SCRIPT="/usr/local/bin/detect-package-manager.sh"
 
 if [ ! -f "$DETECT_SCRIPT" ]; then
     echo "Error: detect-package-manager.sh not found at ${DETECT_SCRIPT}"
@@ -28,13 +27,13 @@ case "${PKG_MANAGER}" in
         apt-get update
         apt-get install -y wget ca-certificates
 
-        # Add Microsoft package repository for Ubuntu/Debian
+        # Install via dotnet-install script
         wget https://dot.net/v1/dotnet-install.sh -O /tmp/dotnet-install.sh
         chmod +x /tmp/dotnet-install.sh
-        /tmp/dotnet-install.sh --version "${DOTNETVERSION}" --install-dir /usr/local/bin
+        /tmp/dotnet-install.sh --channel "${DOTNETVERSION}" --install-dir /usr/share/dotnet
 
         # Create symlink for convenience
-        ln -sf /usr/local/bin/dotnet /usr/bin/dotnet || true
+        ln -sf /usr/share/dotnet/dotnet /usr/local/bin/dotnet
         rm /tmp/dotnet-install.sh
         ;;
     dnf)
@@ -52,10 +51,10 @@ case "${PKG_MANAGER}" in
         # Install via dotnet-install script
         wget https://dot.net/v1/dotnet-install.sh -O /tmp/dotnet-install.sh
         chmod +x /tmp/dotnet-install.sh
-        /tmp/dotnet-install.sh --version "${DOTNETVERSION}" --install-dir /usr/local/bin
+        /tmp/dotnet-install.sh --channel "${DOTNETVERSION}" --install-dir /usr/share/dotnet
 
         # Create symlink for convenience
-        ln -sf /usr/local/bin/dotnet /usr/bin/dotnet || true
+        ln -sf /usr/share/dotnet/dotnet /usr/local/bin/dotnet
         rm /tmp/dotnet-install.sh
         ;;
     *)
@@ -64,13 +63,20 @@ case "${PKG_MANAGER}" in
         ;;
 esac
 
+# Step 2a: Add dotnet to PATH in /etc/profile.d/
+mkdir -p /etc/profile.d
+cat > /etc/profile.d/dotnet-path.sh <<'PATHEOF'
+export PATH="/usr/share/dotnet:${PATH}"
+PATHEOF
+chmod +x /etc/profile.d/dotnet-path.sh
+
 # Step 3: Verify .NET SDK installation
 echo "Verifying .NET SDK installation..."
 dotnet --version
 
-# Step 4: Install Entity Framework tools globally
+# Step 4: Install Entity Framework tools
 echo "Installing Entity Framework tools..."
-dotnet tool install --global dotnet-ef || {
+dotnet tool install dotnet-ef --tool-path /usr/local/bin || {
     echo "Warning: Failed to install dotnet-ef (may already be installed)"
 }
 dotnet ef --version
