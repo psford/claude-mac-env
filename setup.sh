@@ -46,12 +46,6 @@ ask_yn() {
     done
 }
 
-# Welcome banner
-echo "=========================================="
-echo "Claude Mac Environment Setup v0.1.0"
-echo "=========================================="
-echo ""
-
 # Homebrew preflight check
 check_homebrew() {
     info "Checking Homebrew..."
@@ -126,7 +120,7 @@ check_xcode_clt() {
     info "A dialog has appeared to install Xcode Command Line Tools."
     info "Please click 'Install' and wait for completion, then press Enter to continue."
 
-    xcode-select --install
+    xcode-select --install || true
 
     read -p "Press Enter after installation completes: " -r || true
 
@@ -142,10 +136,6 @@ check_xcode_clt() {
     error "Please install manually: xcode-select --install"
     return 1
 }
-
-# Call Homebrew check from main flow
-check_homebrew
-echo ""
 
 # Docker Desktop preflight check
 check_docker() {
@@ -207,9 +197,13 @@ check_docker() {
         if ! command -v docker &>/dev/null; then
             info "Attempting to link Docker binary..."
 
-            # Find the docker binary in Homebrew's Cellar
-            local docker_path
-            docker_path=$(find /opt/homebrew/Caskroom/docker -name docker -type f 2>/dev/null | head -1)
+            # Primary fallback: Docker Desktop binary location
+            local docker_path="/Applications/Docker.app/Contents/Resources/bin/docker"
+
+            if [[ ! -x "$docker_path" ]]; then
+                # Fallback: Find the docker binary in Homebrew's Cellar
+                docker_path=$(find /opt/homebrew/Caskroom/docker -name docker -type f 2>/dev/null | head -1)
+            fi
 
             if [[ -n "$docker_path" && -x "$docker_path" ]]; then
                 if brew link docker 2>/dev/null; then
@@ -217,8 +211,8 @@ check_docker() {
                 else
                     # Manual symlink as fallback per friction log
                     warn "Brew link failed, symlinking manually..."
-                    mkdir -p /usr/local/bin
-                    if ln -sf "$docker_path" /usr/local/bin/docker; then
+                    info "Creating symlink requires elevated permissions..."
+                    if sudo mkdir -p /usr/local/bin && sudo ln -sf "$docker_path" /usr/local/bin/docker; then
                         success "Docker manually symlinked to /usr/local/bin/docker"
                     else
                         error "Failed to symlink Docker binary"
@@ -269,10 +263,6 @@ check_docker() {
         return 1
     fi
 }
-
-# Call Xcode CLT check
-check_xcode_clt
-echo ""
 
 # VS Code preflight check (non-blocking)
 VSCODE_INSTALLED=false
@@ -352,10 +342,6 @@ check_vscode() {
         return 0
     fi
 }
-
-# Call Docker check
-check_docker
-echo ""
 
 # Dev Containers extension check
 check_devcontainers_extension() {
@@ -437,7 +423,7 @@ check_gh_cli() {
             return 1
         fi
     else
-        success "GitHub CLI already installed: $(gh --version)"
+        success "GitHub CLI already installed: $(gh --version | head -n1)"
     fi
 
     # Check authentication status
@@ -523,6 +509,12 @@ check_gh_cli() {
 
 # Run all preflight checks in sequence
 run_preflight() {
+    # Welcome banner
+    echo "=========================================="
+    echo "Claude Mac Environment Setup v0.1.0"
+    echo "=========================================="
+    echo ""
+
     info "Running preflight checks..."
     echo ""
 
@@ -596,7 +588,7 @@ print_summary() {
     fi
 
     local gh_version
-    gh_version=$(gh --version 2>/dev/null || echo "not installed")
+    gh_version=$(gh --version 2>/dev/null | head -n1 || echo "not installed")
 
     local git_identity
     local git_name
