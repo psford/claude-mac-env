@@ -1,0 +1,27 @@
+{
+  "name": "Claude Dev Environment",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "args": {
+      "BASE_IMAGE": "{{BASE_IMAGE}}"
+    }
+  },
+  "remoteUser": "claude",
+  "features": {{FEATURES}},
+  "mounts": [
+    {{PROJECT_MOUNTS}}
+    "source=${localEnv:HOME}/.gitconfig,target=/home/claude/.gitconfig,type=bind,readonly",
+    "source=${localEnv:HOME}/.ssh,target=/home/claude/.ssh,type=bind,readonly"
+  ],
+  "workspaceFolder": "/workspaces",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropics.claude-code"
+        {{EXTRA_EXTENSIONS}}
+      ]
+    }
+  },
+  "postCreateCommand": "bash /workspaces/.claude-mac-env/config/bootstrap-secrets.sh || true"
+}

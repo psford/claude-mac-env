@@ -505,6 +505,340 @@ check_gh_cli() {
     fi
 }
 
+# Render devcontainer.json from template
+render_devcontainer() {
+    info "Rendering devcontainer.json..."
+    echo ""
+
+    local config_file=".user-config.json"
+    local template_file=".devcontainer/devcontainer.json.template"
+    local output_file=".devcontainer/devcontainer.json"
+
+    # Read template
+    if [[ ! -f "$template_file" ]]; then
+        error "Template file not found: $template_file"
+        return 1
+    fi
+
+    local template
+    template=$(cat "$template_file")
+
+    # Extract values from config
+    local base_image
+    base_image=$(jq -r '.baseImage' "$config_file")
+
+    local project_dirs
+    mapfile -t project_dirs < <(jq -r '.projectDirs[]' "$config_file" 2>/dev/null || echo "")
+
+    local selected_features
+    selected_features=$(jq '.features' "$config_file")
+
+    # Build features JSON with GHCR URLs
+    local features_json
+    features_json=$(echo "$selected_features" | jq 'to_entries | map({("ghcr.io/psford/claude-mac-env/\(.key):latest"): .value}) | add')
+
+    # Build project mounts
+    local project_mounts=""
+    for dir in "${project_dirs[@]}"; do
+        if [[ -z "$dir" ]]; then
+            continue
+        fi
+        # Extract directory name from path
+        local dirname
+        dirname=$(basename "$dir")
+        # Add mount entry
+        if [[ -n "$project_mounts" ]]; then
+            project_mounts="${project_mounts},"$'\n'
+        fi
+        project_mounts="${project_mounts}    \"source=$dir,target=/workspaces/$dirname,type=bind\""
+    done
+
+    # Add comma before .gitconfig if there are project mounts
+    if [[ -n "$project_mounts" ]]; then
+        project_mounts="${project_mounts},"$'\n'
+    fi
+
+    # Build extra extensions based on selected features
+    local extra_extensions=""
+    if echo "$selected_features" | jq -e '.["csharp-tools"]' >/dev/null 2>&1; then
+        extra_extensions=$'\n        '"\"ms-dotnettools.csharp\""
+    fi
+
+    # Replace placeholders in template
+    local rendered
+    rendered="$template"
+    rendered="${rendered//\{\{BASE_IMAGE\}\}/$base_image}"
+    rendered="${rendered//\{\{FEATURES\}\}/$features_json}"
+    rendered="${rendered//\{\{PROJECT_MOUNTS\}\}/$project_mounts}"
+    rendered="${rendered//\{\{EXTRA_EXTENSIONS\}\}/$extra_extensions}"
+
+    # Write output
+    echo "$rendered" > "$output_file"
+    success "Generated $output_file"
+    echo ""
+}
+
+# Select features based on identity and manifest
+select_features() {
+    info "Selecting Features..."
+    echo ""
+
+    local config_file=".user-config.json"
+    local github_user
+    github_user=$(jq -r '.githubUser' "$config_file")
+
+    # Fetch manifest from GitHub
+    local manifest
+    if manifest=$(curl -fsSL https://raw.githubusercontent.com/psford/claude-env/main/tooling-manifest.json 2>/dev/null); then
+        success "Downloaded feature manifest"
+    else
+        warn "Failed to fetch feature manifest from GitHub"
+        info "Falling back to claude-skills only"
+        # Fallback: claude-skills only (AC2.6)
+        local selected_features
+        selected_features=$(jq -n '{
+            "claude-skills": {}
+        }')
+        jq ".features = $selected_features" "$config_file" > /tmp/config.tmp && mv /tmp/config.tmp "$config_file"
+        echo ""
+        return 0
+    fi
+
+    # If user is psford, enable all features silently (AC2.1)
+    if [[ "$github_user" == "psford" ]]; then
+        info "Recognized user: psford — enabling all Features"
+        local selected_features
+        selected_features=$(jq -n '{
+            "claude-skills": {},
+            "universal-hooks": {},
+            "csharp-tools": {"dotnetVersion": "9.0"},
+            "psford-personal": {"installAzureCli": true}
+        }')
+        jq ".features = $selected_features" "$config_file" > /tmp/config.tmp && mv /tmp/config.tmp "$config_file"
+        success "All Features enabled for psford"
+        echo ""
+        return 0
+    fi
+
+    # For other users, tiered selection (AC2.2-AC2.5)
+    info "Setting up Features for user: $github_user"
+    echo ""
+
+    # Always include claude-skills
+    local selected_features
+    selected_features=$(jq -n '{
+        "claude-skills": {}
+    }')
+
+    # Universal tier (AC2.3)
+    info "Universal development tools available:"
+    echo "  • Git branch protection — prevents direct push to main/master"
+    echo "  • Log sanitization — CWE-117 prevention"
+    echo "  • Commit atomicity — warns on large unfocused commits"
+    echo "  • Documentation link validation"
+    echo "  • Environment variable loading"
+
+    if ask_yn "Install universal tools?"; then
+        selected_features=$(echo "$selected_features" | jq '. += {"universal-hooks": {}}')
+        success "Universal tools selected"
+    fi
+    echo ""
+
+    # Language tier (AC2.4) - extract unique languages from manifest
+    local languages
+    languages=$(echo "$manifest" | jq -r '.tools[] | select(.tier == "language") | .language' | sort -u)
+
+    for language in $languages; do
+        local feature_name
+        feature_name=$(echo "$manifest" | jq -r ".tools[] | select(.tier == \"language\" and .language == \"$language\") | .feature" | head -1)
+
+        if [[ -z "$feature_name" ]]; then
+            continue
+        fi
+
+        # Build language-specific description from tools
+        local tools_desc
+        tools_desc=$(echo "$manifest" | jq -r ".tools[] | select(.tier == \"language\" and .language == \"$language\") | \"  • \\(.description)\"" | tr '\n' '\n')
+
+        case "$language" in
+            csharp)
+                info "$language / .NET tools available:"
+                echo "$tools_desc"
+                if ask_yn "Install $language tools?"; then
+                    local dotnet_version="9.0"
+                    read -p "  .NET version (default 9.0): " -r version_input
+                    dotnet_version="${version_input:-9.0}"
+                    selected_features=$(echo "$selected_features" | jq --arg ver "$dotnet_version" '. += {"csharp-tools": {"dotnetVersion": $ver}}')
+                    success "$language tools selected with .NET $dotnet_version"
+                fi
+                ;;
+            *)
+                # Handle other languages similarly
+                info "$language tools available:"
+                echo "$tools_desc"
+                if ask_yn "Install $language tools?"; then
+                    selected_features=$(echo "$selected_features" | jq ". += {\"$feature_name\": {}}")
+                    success "$language tools selected"
+                fi
+                ;;
+        esac
+        echo ""
+    done
+
+    # Personal tier (AC2.5) - never shown to non-psford users
+    # (Intentionally omitted)
+
+    # Store selections in config
+    jq ".features = $selected_features" "$config_file" > /tmp/config.tmp && mv /tmp/config.tmp "$config_file"
+    success "Features configuration saved"
+    echo ""
+}
+
+# Collect user input for container configuration
+collect_user_input() {
+    info "Collecting setup configuration..."
+    echo ""
+
+    # Path to config file
+    local config_file=".user-config.json"
+    local existing_config=""
+
+    # Load previous config if it exists
+    if [[ -f "$config_file" ]]; then
+        existing_config=$(cat "$config_file")
+        info "Found existing configuration, using previous values as defaults"
+    fi
+
+    # Prompt for GitHub username
+    local default_github_user=""
+    if [[ -n "$existing_config" ]]; then
+        default_github_user=$(echo "$existing_config" | jq -r '.githubUser // ""')
+    fi
+
+    read -p "GitHub username${default_github_user:+ [$default_github_user]}: " -r github_user
+    github_user="${github_user:-$default_github_user}"
+
+    # Validate GitHub username (alphanumeric, hyphens, non-empty)
+    if ! [[ "$github_user" =~ ^[a-zA-Z0-9-]+$ && -n "$github_user" ]]; then
+        error "Invalid GitHub username. Must be non-empty alphanumeric with hyphens allowed."
+        return 1
+    fi
+    success "GitHub username: $github_user"
+
+    # Prompt for project directories
+    local default_project_dirs="[]"
+    if [[ -n "$existing_config" ]]; then
+        default_project_dirs=$(echo "$existing_config" | jq '.projectDirs')
+    fi
+
+    info "Enter project directory paths (one per line, empty line to finish)"
+    [[ "$default_project_dirs" != "[]" ]] && info "Previous paths: $(echo "$default_project_dirs" | jq -r '.[]' | tr '\n' ', ' | sed 's/,$//')"
+
+    local project_dirs=()
+    while true; do
+        read -p "Project directory: " -r project_dir
+        if [[ -z "$project_dir" ]]; then
+            break
+        fi
+
+        # Expand ~ to home directory
+        project_dir="${project_dir/#\~/$HOME}"
+
+        # Validate path exists
+        if [[ ! -d "$project_dir" ]]; then
+            warn "Directory does not exist: $project_dir"
+            continue
+        fi
+
+        project_dirs+=("$project_dir")
+        success "Added: $project_dir"
+    done
+
+    # If no new dirs entered, use previous defaults
+    if [[ ${#project_dirs[@]} -eq 0 ]] && [[ "$default_project_dirs" != "[]" ]]; then
+        project_dirs=()
+        mapfile -t project_dirs < <(echo "$default_project_dirs" | jq -r '.[]')
+        info "Using previous project directories"
+    fi
+
+    # Distro selection menu
+    info "Select base Docker image:"
+    echo "  1) Ubuntu 24.04 (default)"
+    echo "  2) Debian 12"
+    echo "  3) Fedora 40"
+    echo "  4) Alpine (minimal)"
+    echo "  5) Custom (enter image name)"
+
+    # Show previous choice if available
+    local previous_image="ubuntu:24.04"
+    if [[ -n "$existing_config" ]]; then
+        previous_image=$(echo "$existing_config" | jq -r '.baseImage // "ubuntu:24.04"')
+        info "Previous choice: $previous_image"
+    fi
+
+    local base_image=""
+    local distro_choice
+    while true; do
+        read -p "Choice (1-5) [1]: " -r distro_choice
+        distro_choice="${distro_choice:-1}"
+
+        case "$distro_choice" in
+            1)
+                base_image="ubuntu:24.04"
+                break
+                ;;
+            2)
+                base_image="debian:12"
+                break
+                ;;
+            3)
+                base_image="fedora:40"
+                break
+                ;;
+            4)
+                base_image="alpine:latest"
+                break
+                ;;
+            5)
+                read -p "Enter custom image name: " -r base_image
+                if [[ -z "$base_image" ]]; then
+                    warn "Custom image name cannot be empty"
+                    continue
+                fi
+                break
+                ;;
+            *)
+                warn "Invalid choice. Please enter 1-5"
+                ;;
+        esac
+    done
+    success "Base image: $base_image"
+
+    # Build project dirs JSON array
+    local project_dirs_json="[]"
+    if [[ ${#project_dirs[@]} -gt 0 ]]; then
+        project_dirs_json=$(printf '%s\n' "${project_dirs[@]}" | jq -R . | jq -s .)
+    fi
+
+    # Create or update config file
+    local new_config
+    new_config=$(jq -n \
+        --arg github_user "$github_user" \
+        --argjson project_dirs "$project_dirs_json" \
+        --arg base_image "$base_image" \
+        '{
+            githubUser: $github_user,
+            projectDirs: $project_dirs,
+            baseImage: $base_image,
+            features: {},
+            secrets: {}
+        }')
+
+    echo "$new_config" > "$config_file"
+    success "Configuration saved to $config_file"
+    echo ""
+}
+
 # Run all preflight checks in sequence
 run_preflight() {
     # Welcome banner
@@ -609,6 +943,40 @@ print_summary() {
     echo "=========================================="
 }
 
+# Build Docker image and provide next steps
+build_and_launch() {
+    info "Building Docker image..."
+    echo ""
+
+    local config_file=".user-config.json"
+    local base_image
+    base_image=$(jq -r '.baseImage' "$config_file")
+
+    # Build Docker image
+    if docker build --build-arg "BASE_IMAGE=$base_image" -t claude-mac-env:latest .; then
+        success "Docker image built successfully"
+    else
+        error "Failed to build Docker image"
+        return 1
+    fi
+
+    echo ""
+    success "Setup complete!"
+    echo ""
+    echo "To start your environment:"
+    echo "  1. Open VS Code: code /path/to/claude-mac-env"
+    echo "  2. When prompted, click \"Reopen in Container\""
+    echo "  3. Wait for the container to build (first time only)"
+    echo ""
+    echo "Day-to-day: just open VS Code — it reconnects automatically."
+    echo ""
+    echo "To rebuild from scratch:"
+    echo "  docker rm -f <container>"
+    echo "  docker rmi claude-mac-env:latest"
+    echo "  ./setup.sh"
+    echo ""
+}
+
 # Main entry point
 main() {
     # Check for --preflight-only flag
@@ -617,8 +985,12 @@ main() {
         exit $?
     fi
 
-    # Run full preflight
-    run_preflight
+    # Run full setup flow
+    run_preflight || exit 1
+    collect_user_input || exit 1
+    select_features || exit 1
+    render_devcontainer || exit 1
+    build_and_launch || exit 1
 }
 
 # Run main function
