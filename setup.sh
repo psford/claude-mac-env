@@ -52,29 +52,52 @@ ask_yn() {
 check_homebrew() {
     info "Checking Homebrew..."
 
-    # Check if brew command exists in PATH
+    # Prefer Apple Silicon Homebrew at /opt/homebrew
+    if [[ -x /opt/homebrew/bin/brew ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+        local brew_version
+        brew_version=$(brew --version | head -n1)
+        success "Homebrew found at /opt/homebrew (ARM): $brew_version"
+        return 0
+    fi
+
+    # Check if brew is in PATH (may be ARM or Intel)
     if command -v brew &>/dev/null; then
+        local brew_prefix
+        brew_prefix=$(brew --prefix)
+        if [[ "$brew_prefix" == "/usr/local" ]]; then
+            warn "Found Intel Homebrew at /usr/local on Apple Silicon Mac."
+            warn "Intel Homebrew installs x86 packages — this will cause problems."
+            info "Installing native Apple Silicon Homebrew at /opt/homebrew..."
+            if NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
+                eval "$(/opt/homebrew/bin/brew shellenv)"
+                success "Apple Silicon Homebrew installed at /opt/homebrew"
+                return 0
+            else
+                error "Failed to install Apple Silicon Homebrew"
+                error "You have Intel Homebrew at /usr/local which will install wrong-architecture packages."
+                error "Please install ARM Homebrew manually: https://brew.sh/"
+                return 1
+            fi
+        fi
         local brew_version
         brew_version=$(brew --version | head -n1)
         success "Homebrew already installed: $brew_version"
         return 0
     fi
 
-    # Check common locations for Apple Silicon
-    if [[ -x /opt/homebrew/bin/brew ]]; then
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-        local brew_version
-        brew_version=$(brew --version | head -n1)
-        success "Homebrew found at /opt/homebrew: $brew_version"
-        return 0
-    fi
-
-    # Check legacy location
+    # Check legacy location explicitly (not in PATH)
     if [[ -x /usr/local/bin/brew ]]; then
-        local brew_version
-        brew_version=$(brew --version | head -n1)
-        success "Homebrew found at /usr/local: $brew_version"
-        return 0
+        warn "Found Intel Homebrew at /usr/local but not in PATH on Apple Silicon Mac."
+        info "Installing native Apple Silicon Homebrew at /opt/homebrew..."
+        if NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+            success "Apple Silicon Homebrew installed at /opt/homebrew"
+            return 0
+        else
+            error "Failed to install Apple Silicon Homebrew"
+            return 1
+        fi
     fi
 
     # Homebrew not found - ask for permission to install
