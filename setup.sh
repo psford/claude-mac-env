@@ -124,6 +124,44 @@ check_homebrew() {
     fi
 }
 
+# Xcode CLT preflight check
+check_xcode_clt() {
+    info "Checking Xcode Command Line Tools..."
+
+    if xcode-select -p &>/dev/null; then
+        success "Xcode CLT already installed"
+        if git --version &>/dev/null; then
+            success "Git verified: $(git --version)"
+            return 0
+        fi
+    fi
+
+    # Not installed - trigger the installer
+    info "Installing Xcode Command Line Tools..."
+    info "A dialog has appeared to install Xcode Command Line Tools."
+    info "Please click 'Install' and wait for completion, then press Enter to continue."
+
+    xcode-select --install
+
+    read -p "Press Enter after installation completes: " -r || true
+
+    # Re-check installation
+    if xcode-select -p &>/dev/null; then
+        if git --version &>/dev/null; then
+            success "Xcode CLT installed successfully"
+            return 0
+        fi
+    fi
+
+    error "Xcode Command Line Tools installation could not be verified"
+    error "Please install manually: xcode-select --install"
+    return 1
+}
+
 # Call Homebrew check from main flow
 check_homebrew
+echo ""
+
+# Call Xcode CLT check
+check_xcode_clt
 echo ""
