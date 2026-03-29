@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+
 # psford-personal Feature: Install project-specific guards, helpers, and Azure tooling
 
 echo "Installing psford Personal Development Tools..."
@@ -57,7 +59,7 @@ fi
 
 # Step 3: Install Python dependencies
 echo "Installing Python dependencies for helpers..."
-pip3 install --upgrade pip || true
+pip3 install --upgrade pip --break-system-packages || true
 pip3 install --break-system-packages slack-bolt slack-sdk requests anthropic || {
     echo "Warning: Some Python dependencies may not have installed successfully"
 }

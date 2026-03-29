@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+
 # csharp-tools Feature: Install .NET SDK and C# development tools
 
 echo "Installing C# / .NET Development Tools..."
