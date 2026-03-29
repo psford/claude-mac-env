@@ -1,0 +1,8 @@
+{
+  "id": "universal-hooks",
+  "version": "1.0.0",
+  "name": "Universal Git & Claude Hooks",
+  "description": "Branch protection, log sanitization, commit atomicity, documentation, and commit permission hooks",
+  "options": {},
+  "installsAfter": ["ghcr.io/psford/claude-mac-env/claude-skills"]
+}
