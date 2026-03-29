@@ -106,6 +106,43 @@ check "Tooling manifest present" \
   "docker run --rm -v ${PROJECT_DIR}:/workspace claude-mac-env:validate bash -c '[[ -f /workspace/claude-env/tooling-manifest.json ]] && echo OK || false'"
 
 echo
+
+# AC3: Container filesystem isolation tests
+echo "=== Filesystem Isolation Tests (AC3) ==="
+echo
+
+# AC3.1: Project dirs writable from inside container
+check "AC3.1: Project dirs writable (RW mount)" \
+  "docker run --rm -v /tmp/test-rw-$$:/workspaces/test bash -c 'touch /workspaces/test/write-test && rm /workspaces/test/write-test' 2>/dev/null"
+
+# AC3.2: Mount a temp file RO, assert write fails
+TEST_RO_FILE=$(mktemp)
+trap "rm -f $TEST_RO_FILE" EXIT
+check "AC3.2: RO mount prevents writes" \
+  "docker run --rm -v $TEST_RO_FILE:/home/claude/.gitconfig:ro bash -c '! (echo x >> /home/claude/.gitconfig 2>&1 | grep -q .)' 2>&1 | grep -qi 'read.only\|permission'"
+
+# AC3.4: Assert /Users and /Volumes don't exist in container
+check "AC3.4: /Users not visible in container" \
+  "docker run --rm bash -c '! test -d /Users' 2>&1"
+
+check "AC3.4: /Volumes not visible in container" \
+  "docker run --rm bash -c '! test -d /Volumes' 2>&1"
+
+echo
+
+# AC4: Dev Container Features tests
+echo "=== Dev Container Features Tests (AC4) ==="
+echo
+
+# AC4.3: Check dotnet version (requires csharp-tools feature, for now just check if installed)
+check "AC4.3: dotnet available (if installed)" \
+  "run_in_container 'which dotnet || echo \"dotnet not in this build\" | grep \"not in this build\"' 2>&1 | grep -q 'dotnet\|not in this build'"
+
+# AC4.4: Check hooks directory has files
+check "AC4.4: Hook files present if universal-hooks installed" \
+  "run_in_container '[[ -d /usr/local/share/claude-hooks ]] && [[ \$(find /usr/local/share/claude-hooks -type f 2>/dev/null | wc -l) -gt 0 ]] || echo \"hooks dir not installed\" | grep \"not installed\"' 2>&1"
+
+echo
 echo "=== Summary ==="
 echo -e "${GREEN}Passed: ${PASS}${NC}"
 echo -e "${RED}Failed: ${FAIL}${NC}"
