@@ -1,0 +1,17 @@
+{
+  "id": "psford-personal",
+  "version": "1.0.0",
+  "name": "psford Personal Development Tools",
+  "description": "Project-specific guards, Slack integration, Stream Deck assets, and Azure tooling for psford",
+  "options": {
+    "installAzureCli": {
+      "type": "boolean",
+      "default": true,
+      "description": "Install Azure CLI for Key Vault and deployment tooling"
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/psford/claude-mac-env/universal-hooks",
+    "ghcr.io/psford/claude-mac-env/csharp-tools"
+  ]
+}
