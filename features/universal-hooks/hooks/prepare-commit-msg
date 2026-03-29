@@ -1,0 +1,19 @@
+#!/bin/bash
+# prepare-commit-msg dispatcher — Runs all prepare-commit-msg hook scripts in sequence
+# Exit 0 only if all hooks succeed
+
+set -e
+
+HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Run each prepare-commit-msg-*.sh script in sequence, passing commit message file
+for hook_script in "${HOOKS_DIR}"/prepare-commit-msg-*.sh; do
+    if [ -f "$hook_script" ] && [ -x "$hook_script" ]; then
+        echo "Running $(basename "$hook_script")..."
+        if ! "$hook_script" "$@"; then
+            exit 1
+        fi
+    fi
+done
+
+exit 0

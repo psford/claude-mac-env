@@ -6,6 +6,11 @@
 
 set -e
 
+# Skip in non-interactive contexts (CI, automated processes)
+if [ ! -t 0 ]; then
+    exit 0
+fi
+
 # Get list of staged files
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
 FILE_COUNT=$(echo "$STAGED_FILES" | wc -l)

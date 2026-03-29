@@ -3,7 +3,8 @@ set -e
 
 # claude-skills Feature: Install ed3d plugin skills and psford custom skills
 
-SKILLS_DIR="/root/.claude/skills"
+# Use the remote user's home directory for skills installation
+SKILLS_DIR="${_REMOTE_USER_HOME}/.claude/skills"
 ED3D_REPO="https://github.com/psford/ed3d-plugins.git"
 CLAUDE_ENV_REPO="https://github.com/psford/claude-env.git"
 
@@ -21,10 +22,16 @@ echo "Claude CLI version: $(claude --version)"
 mkdir -p "${SKILLS_DIR}"
 echo "Created skills directory: ${SKILLS_DIR}"
 
-# Step 3: Clone ed3d plugin skills repository
+# Step 3: Create temporary directories with cleanup function
 ED3D_TEMP_DIR=$(mktemp -d)
-trap "rm -rf ${ED3D_TEMP_DIR}" EXIT
+CLAUDE_ENV_TEMP_DIR=$(mktemp -d)
 
+cleanup() {
+    rm -rf "$ED3D_TEMP_DIR" "$CLAUDE_ENV_TEMP_DIR"
+}
+trap cleanup EXIT
+
+# Step 4: Clone ed3d plugin skills repository
 echo "Cloning ed3d plugin skills from ${ED3D_REPO}..."
 if git clone --depth 1 "${ED3D_REPO}" "${ED3D_TEMP_DIR}" 2>/dev/null; then
     # ed3d-plugins expected structure: each skill is a directory with SKILL.md
@@ -43,10 +50,7 @@ else
     echo "Warning: Failed to clone ed3d-plugins. Continuing with other skill sources."
 fi
 
-# Step 4: Clone psford custom skills from claude-env repository
-CLAUDE_ENV_TEMP_DIR=$(mktemp -d)
-trap "rm -rf ${ED3D_TEMP_DIR} ${CLAUDE_ENV_TEMP_DIR}" EXIT
-
+# Step 5: Clone psford custom skills from claude-env repository
 echo "Cloning psford custom skills from ${CLAUDE_ENV_REPO}..."
 if git clone --depth 1 "${CLAUDE_ENV_REPO}" "${CLAUDE_ENV_TEMP_DIR}" 2>/dev/null; then
     # psford custom skills expected structure: ~/.claude/skills/
@@ -65,7 +69,13 @@ else
     echo "Warning: Failed to clone claude-env repository. Continuing."
 fi
 
-# Step 5: Verify skills are installed
+# Step 6: Set proper ownership of the skills directory for the remote user
+if [ -n "${_REMOTE_USER}" ]; then
+    chown -R "${_REMOTE_USER}:${_REMOTE_USER}" "${_REMOTE_USER_HOME}/.claude"
+    echo "Set ownership of .claude directory to ${_REMOTE_USER}"
+fi
+
+# Step 7: Verify skills are installed
 echo "Verifying installed skills..."
 if [ "$(ls -A ${SKILLS_DIR})" ]; then
     echo "Successfully installed $(ls -1 ${SKILLS_DIR} | wc -l) skill(s):"

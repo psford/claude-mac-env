@@ -1,0 +1,19 @@
+#!/bin/bash
+# pre-push dispatcher — Runs all pre-push hook scripts in sequence
+# Exit 0 only if all hooks succeed
+
+set -e
+
+HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Run each pre-push-*.sh script in sequence
+for hook_script in "${HOOKS_DIR}"/pre-push-*.sh; do
+    if [ -f "$hook_script" ] && [ -x "$hook_script" ]; then
+        echo "Running $(basename "$hook_script")..."
+        if ! "$hook_script"; then
+            exit 1
+        fi
+    fi
+done
+
+exit 0

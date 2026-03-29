@@ -6,6 +6,11 @@
 
 set -e
 
+# Skip in non-interactive contexts (CI, automated processes)
+if [ ! -t 0 ]; then
+    exit 0
+fi
+
 # Get the current branch
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 

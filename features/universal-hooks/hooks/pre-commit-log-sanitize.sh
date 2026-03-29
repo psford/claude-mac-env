@@ -15,7 +15,7 @@ LOG_INJECTION_PATTERNS=(
     'logger\..*\(\$'           # Variable interpolation in logger calls
     'console\.log\(\$'         # Variable in console.log
     'print\(\$'                # Variable in print
-    'echo.*\$'                 # Variable in echo
+    'echo.*\$\{'               # Variable in echo (template literals and expansions)
     'log\..*\(\`.*\$\{.*\}\`' # Template literals with variables
 )
 

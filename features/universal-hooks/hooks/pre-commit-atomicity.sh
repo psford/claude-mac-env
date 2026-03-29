@@ -9,6 +9,11 @@ set -e
 # Get list of staged files
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
 
+# Skip if no files are staged
+if [ -z "$STAGED_FILES" ]; then
+    exit 0
+fi
+
 # Count files in this commit
 FILE_COUNT=$(echo "$STAGED_FILES" | wc -l)
 
