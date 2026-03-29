@@ -372,6 +372,178 @@ check_vscode() {
 check_docker
 echo ""
 
+# Dev Containers extension check
+check_devcontainers_extension() {
+    # Only run if VS Code is installed
+    if [[ "$VSCODE_INSTALLED" != "true" ]]; then
+        info "VS Code not installed, skipping Dev Containers extension"
+        return 0
+    fi
+
+    info "Checking Dev Containers extension..."
+
+    # Check if extension is installed
+    if code --list-extensions 2>/dev/null | grep -qi "ms-vscode-remote.remote-containers"; then
+        success "Dev Containers extension already installed"
+        return 0
+    fi
+
+    # Install the extension
+    info "Installing Dev Containers extension..."
+    if code --install-extension ms-vscode-remote.remote-containers; then
+        success "Dev Containers extension installed"
+        return 0
+    else
+        warn "Dev Containers extension installation failed"
+        return 0
+    fi
+}
+
+# gh CLI preflight check
+check_gh_cli() {
+    info "Checking GitHub CLI..."
+
+    # Check if gh command exists
+    if ! command -v gh &>/dev/null; then
+        # gh not installed - ask for permission
+        info "GitHub CLI (gh) is required for Git authentication."
+        if ask_yn "Install GitHub CLI?"; then
+            info "Installing gh via Homebrew..."
+            if brew install gh; then
+                info "gh installed, verifying binary..."
+            else
+                error "GitHub CLI installation failed"
+                return 1
+            fi
+
+            # Verify binary exists and try to link it
+            if ! command -v gh &>/dev/null; then
+                info "Attempting to link gh binary..."
+
+                # Find the gh binary in Homebrew
+                local gh_path
+                gh_path=$(find /opt/homebrew/Cellar/gh -name gh -type f 2>/dev/null | head -1)
+
+                if [[ -n "$gh_path" && -x "$gh_path" ]]; then
+                    if brew link gh 2>/dev/null; then
+                        success "gh linked via brew"
+                    else
+                        # Manual symlink as fallback per friction log
+                        warn "Brew link failed, symlinking manually..."
+                        mkdir -p /usr/local/bin
+                        if ln -sf "$gh_path" /usr/local/bin/gh; then
+                            success "gh manually symlinked to /usr/local/bin/gh"
+                        else
+                            error "Failed to symlink gh binary"
+                            return 1
+                        fi
+                    fi
+                fi
+            fi
+
+            if gh --version &>/dev/null; then
+                success "GitHub CLI verified"
+            else
+                error "GitHub CLI could not be verified"
+                return 1
+            fi
+        else
+            error "GitHub CLI is required to continue"
+            return 1
+        fi
+    else
+        success "GitHub CLI already installed: $(gh --version)"
+    fi
+
+    # Check authentication status
+    info "Checking GitHub authentication..."
+    if gh auth status &>/dev/null; then
+        success "GitHub account authenticated"
+    else
+        info "GitHub authentication required. A browser window will open for you to authorize."
+        if ask_yn "Authenticate with GitHub?"; then
+            info "Opening GitHub authentication flow..."
+            if gh auth login --web --git-protocol https; then
+                success "GitHub authentication successful"
+            else
+                error "GitHub authentication failed"
+                return 1
+            fi
+        else
+            error "GitHub authentication is required to continue"
+            return 1
+        fi
+    fi
+
+    # Configure git to use gh as credential helper
+    info "Configuring Git to use GitHub CLI..."
+    if gh auth setup-git; then
+        success "Git credential helper configured"
+    else
+        warn "Could not configure git credential helper automatically"
+    fi
+
+    # Check git identity
+    info "Checking Git identity..."
+    local git_name
+    local git_email
+    git_name=$(git config --global user.name || echo "")
+    git_email=$(git config --global user.email || echo "")
+
+    if [[ -n "$git_name" && -n "$git_email" ]]; then
+        success "Git identity configured: $git_name <$git_email>"
+        return 0
+    fi
+
+    # Git identity not configured - try to pull from GitHub or prompt manually
+    info "Git identity not configured globally."
+
+    # Try to get name and email from GitHub profile
+    if gh auth status &>/dev/null; then
+        info "Attempting to use GitHub profile information..."
+        local github_name
+        github_name=$(gh api user --jq '.name // .login' 2>/dev/null || echo "")
+
+        if [[ -n "$github_name" ]]; then
+            git_name="$github_name"
+            info "Using GitHub name: $git_name"
+        fi
+
+        # GitHub API doesn't expose private email via simple query, prompt for it
+        if [[ -z "$git_email" ]]; then
+            echo "Your GitHub username suggests your name is: $git_name"
+            read -p "Enter your Git email address: " -r git_email || git_email=""
+        fi
+    fi
+
+    # If still not set, prompt manually
+    if [[ -z "$git_name" ]]; then
+        read -p "Enter your Git name: " -r git_name || git_name=""
+    fi
+
+    if [[ -z "$git_email" ]]; then
+        read -p "Enter your Git email: " -r git_email || git_email=""
+    fi
+
+    # Validate and configure
+    if [[ -n "$git_name" && -n "$git_email" ]]; then
+        git config --global user.name "$git_name"
+        git config --global user.email "$git_email"
+        success "Git identity configured: $git_name <$git_email>"
+    else
+        error "Git identity could not be configured"
+        return 1
+    fi
+}
+
 # Call VS Code check
 check_vscode
+echo ""
+
+# Call Dev Containers extension check
+check_devcontainers_extension
+echo ""
+
+# Call gh CLI check
+check_gh_cli
 echo ""
