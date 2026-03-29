@@ -1,0 +1,8 @@
+{
+  "id": "claude-skills",
+  "version": "1.0.0",
+  "name": "Claude Code Skills",
+  "description": "Installs ed3d plugin skills and psford custom skills for Claude Code",
+  "options": {},
+  "installsAfter": []
+}
