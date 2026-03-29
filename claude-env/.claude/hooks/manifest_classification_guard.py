@@ -27,7 +27,17 @@ from typing import Optional, Dict, List, Set
 
 def get_manifest_path() -> Path:
     """Get path to tooling-manifest.json relative to repo root."""
-    repo_root = Path(__file__).parent.parent
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        repo_root = Path(result.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # Fallback to parent directory if git is not available
+        repo_root = Path(__file__).parent.parent
     return repo_root / "tooling-manifest.json"
 
 
@@ -138,9 +148,11 @@ def classify_tool(file_path: str, content: str) -> Dict:
     content_lower = content.lower()
 
     # Check for universal indicators
+    # Only use specific patterns that identify truly universal tools
     universal_keywords = [
-        "commit", "branch", "push", "main", "git", "validation",
-        "security", "scan", "link", "check", "guard", "shell"
+        "git_commit", "branch_from_main", "cherry_pick", "shellcheck",
+        "log_sanitization", "commit_atomicity", "block_main", "security_scan",
+        "check_links", "stale_path"
     ]
 
     if any(kw in path_lower for kw in universal_keywords):
@@ -169,6 +181,9 @@ def classify_tool(file_path: str, content: str) -> Dict:
     for line in lines:
         # Look for docstrings or comments that describe the tool
         line_stripped = line.strip()
+        if line_stripped.startswith("#!"):
+            # Skip shebang lines
+            continue
         if line_stripped.startswith('"""') or line_stripped.startswith("'''"):
             # Found potential docstring
             continue
@@ -202,14 +217,6 @@ def classify_tool(file_path: str, content: str) -> Dict:
     }
 
 
-def get_next_tool_id(existing_names: Set[str]) -> str:
-    """Generate a unique tool name/ID."""
-    counter = 1
-    while f"tool-{counter}" in existing_names:
-        counter += 1
-    return f"tool-{counter}"
-
-
 def add_tool_to_manifest(manifest: Dict, file_path: str, classification: Dict) -> bool:
     """
     Add a tool entry to the manifest.
@@ -226,10 +233,11 @@ def add_tool_to_manifest(manifest: Dict, file_path: str, classification: Dict) -
     file_name = Path(file_path).stem
 
     # Try to use filename as name, but make it unique if needed
-    tool_name = file_name
+    # Convert underscores to hyphens for consistency with manifest naming
+    tool_name = file_name.replace("_", "-")
     counter = 1
     while tool_name in existing_names:
-        tool_name = f"{file_name}-{counter}"
+        tool_name = f"{file_name.replace('_', '-')}-{counter}"
         counter += 1
 
     tool_entry = {

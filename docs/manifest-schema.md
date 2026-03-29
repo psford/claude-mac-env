@@ -85,9 +85,21 @@ The manifest drives tiered tooling selection:
 
 The manifest must validate against the JSON Schema in `tooling-manifest.schema.json` in the same repository.
 
-Validate with:
+### Quick JSON Syntax Check
+
+Validate JSON syntax with:
 ```bash
 python3 -c "import json; json.load(open('tooling-manifest.json')); print('Valid')"
+```
+
+**Note:** This command only verifies JSON syntax, not schema compliance.
+
+### Full Schema Validation
+
+For comprehensive schema validation (including field types, required properties, etc.), use the `jsonschema` package:
+```bash
+pip install jsonschema
+python3 -m jsonschema -i tooling-manifest.json tooling-manifest.schema.json
 ```
 
 ## Maintenance
