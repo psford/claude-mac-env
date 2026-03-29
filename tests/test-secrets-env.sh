@@ -147,8 +147,13 @@ EOF
 rm -f "$TEST_OUTPUT_FILE"
 bash -c "export USER_CONFIG='$TEST_CONFIG_FILE' && export SECRETS_OUTPUT_PATH='$TEST_OUTPUT_FILE' && source '$INTERFACE_SCRIPT' && source '$PROVIDER_SCRIPT' && secrets_inject" >/dev/null 2>&1
 
-assert_success "handles quoted values" \
-    bash -c "grep -q 'QUOTED_VAR=' '$TEST_OUTPUT_FILE' && grep -q 'SINGLE_QUOTED=' '$TEST_OUTPUT_FILE'"
+# Test that double-quoted values are correctly stripped and re-wrapped
+assert_output_contains "double-quoted values stripped and re-wrapped" 'export QUOTED_VAR="value with spaces"' \
+    cat "$TEST_OUTPUT_FILE"
+
+# Test that single-quoted values are correctly stripped and re-wrapped
+assert_output_contains "single-quoted values stripped and re-wrapped" 'export SINGLE_QUOTED="another value"' \
+    cat "$TEST_OUTPUT_FILE"
 
 # Summary
 echo ""

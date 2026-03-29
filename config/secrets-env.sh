@@ -100,6 +100,13 @@ secrets_inject() {
         if [[ "$line" =~ ^[[:space:]]*export[[:space:]]+([^=]+)=(.*)$ ]]; then
             local var_name="${BASH_REMATCH[1]}"
             local var_value="${BASH_REMATCH[2]}"
+
+            # Strip surrounding quotes if present (handles both double and single quotes)
+            var_value="${var_value#\"}"
+            var_value="${var_value%\"}"
+            var_value="${var_value#\'}"
+            var_value="${var_value%\'}"
+
             # Escape any embedded double quotes in the value
             var_value="${var_value//\"/\\\"}"
             echo "export ${var_name}=\"${var_value}\"" >> "$temp_output"

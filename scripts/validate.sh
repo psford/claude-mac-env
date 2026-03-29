@@ -93,13 +93,13 @@ check "curl available" "run_in_container 'curl --version | head -1'"
 echo
 echo "Checking Feature artifacts..."
 
-# universal-hooks should install hook files to ~/.claude/hooks/
+# universal-hooks should install hook files to /usr/local/share/claude-hooks/
 check "universal-hooks Feature installed" \
-  "run_in_container '[[ -d /home/claude/.claude/hooks ]] && echo OK || false'"
+  "run_in_container '[[ -d /usr/local/share/claude-hooks ]] && echo OK || false'"
 
 # Check if at least one hook file exists
 check "Hook files present" \
-  "run_in_container '[[ \$(find /home/claude/.claude/hooks -type f 2>/dev/null | wc -l) -gt 0 ]] && echo OK || false'"
+  "run_in_container '[[ \$(find /usr/local/share/claude-hooks -type f 2>/dev/null | wc -l) -gt 0 ]] && echo OK || false'"
 
 # Check for manifest (if available)
 check "Tooling manifest present" \

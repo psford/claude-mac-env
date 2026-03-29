@@ -211,54 +211,51 @@ Secrets providers supply environment variables to the container at startup. Thre
 Each provider implements these functions in `config/secrets-<name>.sh`:
 
 ```bash
-# Check if the provider is available on this system
-secrets_<name>_available() {
-  # Return 0 if available, 1 if not
-  command -v some_tool >/dev/null 2>&1
+# Describe this provider (shown in setup menu)
+secrets_describe() {
+  echo "Brief description of what this provider does"
 }
 
-# Load secrets and export them as environment variables
-secrets_<name>_load() {
-  # Query secrets from the provider
-  # Export each as: export SECRET_NAME="value"
-  export API_KEY="$(retrieve_secret ...)"
+# Validate that the provider is configured correctly
+# Returns 0 if valid, 1 if not (with error message to stderr)
+secrets_validate() {
+  # Check configuration, verify prerequisites, etc.
+  # Exit with code 0 if valid, 1 if invalid
+  return 0
 }
 
-# Prompt the user to set up this provider
-secrets_<name>_setup() {
-  echo "Configuring provider..."
-  # Interactive setup steps, validation, etc.
+# Inject secrets into the output file at $SECRETS_OUTPUT_PATH
+# The output should be shell-sourceable (e.g., "export VAR=value")
+secrets_inject() {
+  # Read secrets from the provider
+  # Write to $SECRETS_OUTPUT_PATH in sourceable format
+  echo "export API_KEY=\"$(retrieve_secret ...)\"" >> "$SECRETS_OUTPUT_PATH"
 }
 ```
 
 ### Registering a provider
 
-Edit `setup.sh` to add the provider to the menu:
+Edit `setup.sh` to add a provider selection function. See `select_env_provider()`, `select_keychain_provider()`, and `select_azure_provider()` as examples.
+
+The function should:
+1. Prompt the user for configuration
+2. Save the configuration to `.user-config.json` under `secrets.provider` and any provider-specific settings
+3. Test the configuration by calling `secrets_validate()` from the provider script
+
+Example:
 
 ```bash
-menu_secrets() {
-  echo "Choose a secrets provider:"
-  echo "1) Environment file (~/.env)"
-  echo "2) macOS Keychain"
-  echo "3) Azure Key Vault"
-  echo "4) My Custom Provider"  # <-- Add here
-  read -p "Choice: " choice
+select_custom_provider() {
+  local config_file="$1"
 
-  case "${choice}" in
-    4) SECRETS_PROVIDER="custom" ;;
-    # ... existing cases ...
-  esac
+  info "Configuring custom provider..."
+  # Prompt for configuration
+  # Validate using the provider script
+  # Save to config file
 }
 ```
 
-Then, in the container startup logic, source and call your provider:
-
-```bash
-if [[ -n "${SECRETS_PROVIDER}" ]]; then
-  source "config/secrets-${SECRETS_PROVIDER}.sh"
-  secrets_${SECRETS_PROVIDER}_load
-fi
-```
+Then add it to the `select_secrets_provider()` menu in `setup.sh`.
 
 ## Testing
 

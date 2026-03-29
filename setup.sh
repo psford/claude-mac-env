@@ -514,6 +514,17 @@ select_secrets_provider() {
 
     local config_file=".user-config.json"
 
+    # Guard: Verify config file exists and is valid JSON
+    if [[ ! -f "$config_file" ]]; then
+        error "Configuration file not found: $config_file"
+        return 1
+    fi
+
+    if ! jq empty "$config_file" 2>/dev/null; then
+        error "Configuration file is not valid JSON: $config_file"
+        return 1
+    fi
+
     # Get previous selection if available
     local previous_provider=""
     if [[ -f "$config_file" ]]; then
@@ -1055,13 +1066,12 @@ collect_user_input() {
         info "Using previous project directories"
     fi
 
-    # Distro selection menu
-    info "Select base Docker image:"
+    # Distro selection menu - currently supports apt-based distros only
+    # Note: Multi-distro support (Fedora, Alpine) is planned for a future version.
+    # The Dockerfile uses apt for package management, so only apt-based distros are supported.
+    info "Select base Docker image (apt-based distros only):"
     echo "  1) Ubuntu 24.04 (default)"
     echo "  2) Debian 12"
-    echo "  3) Fedora 40"
-    echo "  4) Alpine (minimal)"
-    echo "  5) Custom (enter image name)"
 
     # Show previous choice if available
     local previous_image="ubuntu:24.04"
@@ -1073,7 +1083,7 @@ collect_user_input() {
     local base_image=""
     local distro_choice
     while true; do
-        read -p "Choice (1-5) [1]: " -r distro_choice
+        read -p "Choice (1-2) [1]: " -r distro_choice
         distro_choice="${distro_choice:-1}"
 
         case "$distro_choice" in
@@ -1085,24 +1095,8 @@ collect_user_input() {
                 base_image="debian:12"
                 break
                 ;;
-            3)
-                base_image="fedora:40"
-                break
-                ;;
-            4)
-                base_image="alpine:latest"
-                break
-                ;;
-            5)
-                read -p "Enter custom image name: " -r base_image
-                if [[ -z "$base_image" ]]; then
-                    warn "Custom image name cannot be empty"
-                    continue
-                fi
-                break
-                ;;
             *)
-                warn "Invalid choice. Please enter 1-5"
+                warn "Invalid choice. Please enter 1-2"
                 ;;
         esac
     done
