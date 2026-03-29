@@ -1,0 +1,22 @@
+{
+  "name": "Claude Dev Environment",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "claude",
+  "mounts": [
+    "source=${localEnv:HOME}/.gitconfig,target=/home/claude/.gitconfig,type=bind,readonly",
+    "source=${localEnv:HOME}/.ssh,target=/home/claude/.ssh,type=bind,readonly"
+  ],
+  "workspaceFolder": "/workspaces",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces,type=bind",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropics.claude-code"
+      ]
+    }
+  },
+  "postCreateCommand": "echo 'Claude Dev Environment ready. Claude Code version:' && claude --version"
+}
