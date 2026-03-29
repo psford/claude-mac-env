@@ -58,3 +58,44 @@ This is an **unavoidable interactive step** — GitHub OAuth requires browser in
 
 ### Takeaway for users
 One-time interactive step. Can't be avoided, but can be explained clearly so it's not surprising.
+
+---
+
+## 2026-03-29: Git identity not configured
+
+### What happened
+First `git commit` in the new repo triggered a warning: "Your name and email address were configured automatically based on your username and hostname." Commit used `patrickford@Patricks-MacBook-Air.local` instead of the user's actual email.
+
+### Friction
+Not a hard stop — commit still succeeded — but the identity is wrong. On a fresh Mac, `~/.gitconfig` may not exist or may not have `user.name` / `user.email` set.
+
+### What `setup.sh` should do
+1. Check if `git config --global user.name` and `git config --global user.email` are set.
+2. If not, this is a preflight item: prompt the user for their name and email, or offer to pull from their GitHub profile (`gh api user` returns name and email).
+3. Run `git config --global user.name "..."` and `git config --global user.email "..."`.
+4. This also affects the `.gitconfig` read-only mount into the container — if it's empty/missing, the container inherits the same problem.
+
+### Why this matters for the container
+The container mounts `~/.gitconfig` read-only. If git identity isn't configured on the Mac before the container starts, Claude Code inside the container will have the same unconfigured identity. This must be caught in preflight, not after the container is running.
+
+### Takeaway for users
+Solvable automatically. `setup.sh` should detect and configure git identity early in the preflight phase, ideally pulling from the GitHub profile since we already have `gh` authenticated.
+
+---
+
+## 2026-03-29: gh auth doesn't configure git credential helper
+
+### What happened
+After `gh auth login` succeeded, `git push` failed with `fatal: could not read Username for 'https://github.com': Device not configured`. The gh CLI was authenticated but git didn't know to use gh as its credential helper.
+
+### What fixed it
+`gh auth setup-git` — configures git to use gh as the credential helper. After this, `git push` worked immediately.
+
+### Root cause
+`gh auth login` authenticates the gh CLI tool. `gh auth setup-git` separately configures git's credential.helper to use gh for HTTPS auth. These are two distinct steps and the first doesn't automatically do the second.
+
+### What `setup.sh` should do
+After `gh auth login` succeeds, always run `gh auth setup-git` immediately. These should be treated as a single atomic operation in the setup flow. Never assume that gh auth implies git auth.
+
+### Takeaway for users
+Invisible if setup.sh handles it. But if a user is troubleshooting manually, "gh is authenticated but git push fails" is confusing. The error message gives no hint that `gh auth setup-git` is the fix.
