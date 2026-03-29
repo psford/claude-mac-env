@@ -1,0 +1,459 @@
+{
+  "version": "1.0",
+  "features": [
+    {
+      "id": "claude-skills",
+      "description": "Claude Code skills for enhanced development capabilities",
+      "tier": "always"
+    },
+    {
+      "id": "universal-hooks",
+      "description": "Git hooks for branch protection and commit validation",
+      "tier": "universal"
+    },
+    {
+      "id": "csharp-tools",
+      "description": ".NET SDK and C# development helpers",
+      "tier": "language"
+    },
+    {
+      "id": "psford-personal",
+      "description": "Personal utilities and project-specific tooling",
+      "tier": "personal"
+    }
+  ],
+  "tools": [
+    {
+      "name": "git-commit-guard",
+      "source": ".claude/hooks/git_commit_guard.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Validates git commit standards before pushing"
+    },
+    {
+      "name": "branch-from-main-guard",
+      "source": ".claude/hooks/branch_from_main_guard.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Ensures branches originate from main"
+    },
+    {
+      "name": "cherry-pick-guard",
+      "source": ".claude/hooks/cherry_pick_guard.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Guards cherry-pick operations"
+    },
+    {
+      "name": "pre-push-merged-branch-guard",
+      "source": ".claude/hooks/pre_push_merged_branch_guard.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Prevents pushing merged branches"
+    },
+    {
+      "name": "main-branch-guard",
+      "source": ".claude/hooks/main_branch_guard.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Protects main branch integrity"
+    },
+    {
+      "name": "shellcheck-write-guard",
+      "source": ".claude/hooks/shellcheck_write_guard.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Validates shell script quality"
+    },
+    {
+      "name": "spec-staleness-guard",
+      "source": ".claude/hooks/spec_staleness_guard.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Checks specification freshness"
+    },
+    {
+      "name": "stale-path-guard",
+      "source": ".claude/hooks/stale_path_guard.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Identifies outdated file paths"
+    },
+    {
+      "name": "block-main-commits",
+      "source": "helpers/hooks/block_main_commits.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Git pre-commit: block commits to main branch"
+    },
+    {
+      "name": "check-log-sanitization",
+      "source": "helpers/hooks/check_log_sanitization.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Git pre-commit: CWE-117 prevention for log injection"
+    },
+    {
+      "name": "check-md-table-totals",
+      "source": "helpers/hooks/check_md_table_totals.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Git pre-commit: validate markdown table totals"
+    },
+    {
+      "name": "commit-atomicity-guard",
+      "source": "helpers/hooks/commit_atomicity_guard.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Git pre-commit: ensure atomic commits"
+    },
+    {
+      "name": "jenkins-pre-push",
+      "source": "helpers/hooks/jenkins_pre_push.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Git pre-push: CI/Jenkins checks"
+    },
+    {
+      "name": "validate-doc-links",
+      "source": "helpers/hooks/validate_doc_links.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Git pre-commit: validate documentation links"
+    },
+    {
+      "name": "security-scan",
+      "source": "helpers/security_scan.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Security analysis tool for code scanning"
+    },
+    {
+      "name": "zap-scan",
+      "source": "helpers/zap_scan.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "OWASP ZAP scanning utility"
+    },
+    {
+      "name": "check-links",
+      "source": "helpers/check_links.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Hyperlink validation utility"
+    },
+    {
+      "name": "scan-stale-paths",
+      "source": "helpers/scan_stale_paths.py",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Outdated path identification tool"
+    },
+    {
+      "name": "load-env",
+      "source": "helpers/load-env.sh",
+      "tier": "universal",
+      "language": null,
+      "feature": "universal-hooks",
+      "description": "Environment variable loader utility"
+    },
+    {
+      "name": "dotnet-process-guard",
+      "source": ".claude/hooks/dotnet_process_guard.py",
+      "tier": "language",
+      "language": "csharp",
+      "feature": "csharp-tools",
+      "description": ".NET process monitoring and enforcement"
+    },
+    {
+      "name": "ef-migration-guard",
+      "source": ".claude/hooks/ef_migration_guard.py",
+      "tier": "language",
+      "language": "csharp",
+      "feature": "csharp-tools",
+      "description": "Entity Framework migration enforcement"
+    },
+    {
+      "name": "test-docs-tabs",
+      "source": "helpers/test_docs_tabs.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Test documentation tab rendering"
+    },
+    {
+      "name": "test-hover-images",
+      "source": "helpers/test_hover_images.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Test hover image functionality"
+    },
+    {
+      "name": "generate-stream-deck-icons",
+      "source": "helpers/generate_stream_deck_icons.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Generate Stream Deck icon assets"
+    },
+    {
+      "name": "speech-to-text",
+      "source": "helpers/Invoke-SpeechToText.ps1",
+      "tier": "personal",
+      "language": "powershell",
+      "feature": "psford-personal",
+      "description": "PowerShell speech-to-text integration"
+    },
+    {
+      "name": "slack-notify",
+      "source": "helpers/slack_notify.sh",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Slack notification helper"
+    },
+    {
+      "name": "slack-post-message",
+      "source": "helpers/slack_post_message.sh",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Post messages to Slack channels"
+    },
+    {
+      "name": "slack-thread-reply",
+      "source": "helpers/slack_thread_reply.sh",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Send Slack thread replies"
+    },
+    {
+      "name": "slack-upload-file",
+      "source": "helpers/slack_upload_file.sh",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Upload files to Slack"
+    },
+    {
+      "name": "slack-reaction-add",
+      "source": "helpers/slack_reaction_add.sh",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Add emoji reactions to Slack messages"
+    },
+    {
+      "name": "responsive-tests-check",
+      "source": "helpers/hooks/check_responsive_tests.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Check responsive design test coverage"
+    },
+    {
+      "name": "hf-url-validator",
+      "source": "helpers/hooks/validate_hf_urls.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Validate HuggingFace URLs"
+    },
+    {
+      "name": "azure-auth-guard",
+      "source": ".claude/hooks/azure_auth_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Azure authentication enforcement"
+    },
+    {
+      "name": "azure-subscription-guard",
+      "source": ".claude/hooks/azure_subscription_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Azure subscription validation"
+    },
+    {
+      "name": "azure-resource-guard",
+      "source": ".claude/hooks/azure_resource_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Azure resource naming validation"
+    },
+    {
+      "name": "project-file-guard",
+      "source": ".claude/hooks/project_file_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Project file integrity checks"
+    },
+    {
+      "name": "api-version-guard",
+      "source": ".claude/hooks/api_version_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "API version consistency enforcement"
+    },
+    {
+      "name": "config-schema-guard",
+      "source": ".claude/hooks/config_schema_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Configuration schema validation"
+    },
+    {
+      "name": "environment-var-guard",
+      "source": ".claude/hooks/environment_var_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Environment variable validation"
+    },
+    {
+      "name": "docker-build-guard",
+      "source": ".claude/hooks/docker_build_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Docker build validation"
+    },
+    {
+      "name": "kubernetes-manifest-guard",
+      "source": ".claude/hooks/kubernetes_manifest_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Kubernetes manifest validation"
+    },
+    {
+      "name": "terraform-guard",
+      "source": ".claude/hooks/terraform_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Terraform configuration validation"
+    },
+    {
+      "name": "database-migration-guard",
+      "source": ".claude/hooks/database_migration_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Database migration validation"
+    },
+    {
+      "name": "performance-regression-guard",
+      "source": ".claude/hooks/performance_regression_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Performance regression detection"
+    },
+    {
+      "name": "coverage-threshold-guard",
+      "source": ".claude/hooks/coverage_threshold_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Code coverage threshold enforcement"
+    },
+    {
+      "name": "dependency-audit-guard",
+      "source": ".claude/hooks/dependency_audit_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Dependency security audit"
+    },
+    {
+      "name": "breaking-change-guard",
+      "source": ".claude/hooks/breaking_change_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Breaking change detection and documentation"
+    },
+    {
+      "name": "license-header-guard",
+      "source": ".claude/hooks/license_header_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "License header enforcement"
+    },
+    {
+      "name": "changelog-guard",
+      "source": ".claude/hooks/changelog_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Changelog validation and updates"
+    },
+    {
+      "name": "version-bumping-guard",
+      "source": ".claude/hooks/version_bumping_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Semantic version enforcement"
+    },
+    {
+      "name": "translation-guard",
+      "source": ".claude/hooks/translation_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Internationalization (i18n) validation"
+    },
+    {
+      "name": "accessibility-guard",
+      "source": ".claude/hooks/accessibility_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Web accessibility (a11y) compliance check"
+    },
+    {
+      "name": "data-privacy-guard",
+      "source": ".claude/hooks/data_privacy_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "Data privacy and PII detection"
+    },
+    {
+      "name": "ci-workflow-guard",
+      "source": ".claude/hooks/ci_workflow_guard.py",
+      "tier": "personal",
+      "language": null,
+      "feature": "psford-personal",
+      "description": "CI/CD workflow validation"
+    }
+  ]
+}
