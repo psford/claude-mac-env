@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["version", "features", "tools"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version"
+    },
+    "features": {
+      "type": "array",
+      "description": "Available Features that tools can belong to",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "tier"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Feature identifier"
+          },
+          "description": {
+            "type": "string",
+            "description": "Feature description"
+          },
+          "tier": {
+            "enum": ["always", "universal", "language", "personal"],
+            "description": "Availability tier for this Feature"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "tools": {
+      "type": "array",
+      "description": "Catalog of all hooks and helpers",
+      "items": {
+        "type": "object",
+        "required": ["name", "source", "tier", "feature", "description"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Tool identifier"
+          },
+          "source": {
+            "type": "string",
+            "description": "File path relative to claude-env root"
+          },
+          "tier": {
+            "enum": ["universal", "language", "personal"],
+            "description": "Availability tier"
+          },
+          "language": {
+            "type": ["string", "null"],
+            "description": "Language affinity (null if universal)"
+          },
+          "feature": {
+            "type": "string",
+            "description": "Target Feature ID"
+          },
+          "description": {
+            "type": "string",
+            "description": "One-line description for setup.sh display"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
