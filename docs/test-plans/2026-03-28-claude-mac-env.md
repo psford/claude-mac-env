@@ -9,35 +9,6 @@ Generated after implementation of all 8 phases. Covers acceptance criteria that 
 - GitHub account with push access to psford/claude-mac-env
 - Azure subscription (for AC7.1 only)
 
-## Automated Tests (run first)
-
-Before manual testing, run all automated tests to establish a baseline:
-
-```bash
-cd /path/to/claude-mac-env
-
-# Python unit tests (manifest classification)
-python3 -m unittest discover -s claude-env -p "test_*.py" -v
-
-# Shell tests (secrets providers + bootstrap)
-bash tests/test-secrets-env.sh
-bash tests/test-secrets-azure.sh
-bash tests/test-secrets-keychain.sh
-bash tests/test-bootstrap-secrets.sh
-
-# Script tests (preflight, identity routing, secrets wrapper)
-bash scripts/test-preflight.sh
-bash scripts/test-identity-routing.sh
-bash scripts/test-secrets.sh
-
-# E2E validation (requires Docker)
-bash scripts/validate.sh
-```
-
-Expected: All tests pass. Any failures must be resolved before manual testing.
-
----
-
 ## Manual Test Procedures
 
 ### 1. Docker Desktop Installation (AC1.2)
