@@ -603,10 +603,10 @@ select_env_provider() {
         break
     done
 
-    # Update config
+    # Update config using jq --arg to safely pass user input
     local tmpfile
     tmpfile=$(mktemp)
-    jq ".secrets.provider = \"env\" | .secrets.envFilePath = \"$env_file_path\"" "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
+    jq --arg path "$env_file_path" '.secrets.provider = "env" | .secrets.envFilePath = $path' "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
     success "Secrets provider configured: .env file"
     echo ""
 }
@@ -670,10 +670,10 @@ select_azure_provider() {
         read -p "Azure Key Vault name: " -r vault_name
     fi
 
-    # Update config
+    # Update config using jq --arg to safely pass user input
     local tmpfile
     tmpfile=$(mktemp)
-    jq ".secrets.provider = \"azure\" | .secrets.azureVaultName = \"$vault_name\"" "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
+    jq --arg vault "$vault_name" '.secrets.provider = "azure" | .secrets.azureVaultName = $vault' "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
     success "Secrets provider configured: Azure Key Vault ($vault_name)"
     echo ""
 }
@@ -715,10 +715,29 @@ select_keychain_provider() {
         info "You can add secrets with: security add-generic-password -s \"$service_name\" -a \"KEY_NAME\" -w \"value\""
     fi
 
-    # Update config
+    # Get previous account list if available
+    local default_accounts=""
+    if [[ -f "$config_file" ]]; then
+        default_accounts=$(jq -r '.secrets.keychainAccounts[]?' "$config_file" 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "")
+    fi
+
+    # Prompt for account names (comma-separated)
+    local accounts_input=""
+    if [[ -n "$default_accounts" ]]; then
+        read -p "Keychain account names (comma-separated) [$default_accounts]: " -r accounts_input
+        accounts_input="${accounts_input:-$default_accounts}"
+    else
+        read -p "Keychain account names (comma-separated): " -r accounts_input
+    fi
+
+    # Convert comma-separated list to JSON array
+    local accounts_json
+    accounts_json=$(echo "$accounts_input" | tr ',' '\n' | sed 's/^[[:space:]]*//g; s/[[:space:]]*$//g' | jq -R . | jq -s . || echo "[]")
+
+    # Update config using jq --arg and --argjson to safely pass user input
     local tmpfile
     tmpfile=$(mktemp)
-    jq ".secrets.provider = \"keychain\" | .secrets.keychainService = \"$service_name\"" "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
+    jq --arg service "$service_name" --argjson accounts "$accounts_json" '.secrets.provider = "keychain" | .secrets.keychainService = $service | .secrets.keychainAccounts = $accounts' "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
     success "Secrets provider configured: macOS Keychain ($service_name)"
     echo ""
 }
@@ -797,6 +816,11 @@ render_devcontainer() {
 
     # Always add config/ mount (read-only) for provider scripts
     secrets_mounts="    \"source=$(pwd)/config,target=/workspaces/.claude-mac-env/config,type=bind,readonly\""
+
+    # Always mount .user-config.json for bootstrap-secrets.sh to access
+    local config_path
+    config_path="$(cd "$(dirname "$config_file")" && pwd)/$(basename "$config_file")"
+    secrets_mounts="${secrets_mounts},"$'\n'"    \"source=${config_path},target=/workspaces/.claude-mac-env/.user-config.json,type=bind,readonly\""
 
     # Add conditional mount for .env file if that provider is selected
     local provider

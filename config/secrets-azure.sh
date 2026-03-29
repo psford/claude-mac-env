@@ -9,6 +9,12 @@
 
 set -euo pipefail
 
+# Check for jq availability
+if ! command -v jq &>/dev/null; then
+  echo "error: jq is required but not installed" >&2
+  return 1 2>/dev/null || exit 1
+fi
+
 # Describe this provider for the setup menu
 secrets_describe() {
     echo "Pull secrets from Azure Key Vault"
@@ -78,6 +84,7 @@ secrets_inject() {
     # Create temporary file to avoid partial writes
     local temp_output
     temp_output=$(mktemp)
+    # shellcheck disable=SC2064
     trap "rm -f '$temp_output'" RETURN
 
     # List secrets from vault
@@ -89,6 +96,7 @@ secrets_inject() {
         mkdir -p "$(dirname "$output_path")"
         touch "$temp_output"
         mv "$temp_output" "$output_path"
+        chmod 600 "$output_path"
         return 0
     fi
 
@@ -104,13 +112,17 @@ secrets_inject() {
         local env_var_name
         env_var_name=$(kebab_to_upper_snake "$secret_name")
 
-        # Write as export statement
-        echo "export ${env_var_name}=${secret_value}" >> "$temp_output"
+        # Escape any embedded double quotes in the value
+        secret_value="${secret_value//\"/\\\"}"
+
+        # Write as export statement with quoted value to preserve spaces
+        echo "export ${env_var_name}=\"${secret_value}\"" >> "$temp_output"
     done <<< "$secret_names"
 
     # Move temp file to final location
     mkdir -p "$(dirname "$output_path")"
     mv "$temp_output" "$output_path"
+    chmod 600 "$output_path"
 
     return 0
 }

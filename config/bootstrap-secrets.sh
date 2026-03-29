@@ -15,8 +15,12 @@ set -o pipefail
 # Script directory for sourcing other scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# User config file path (mounted from host)
-USER_CONFIG="${USER_CONFIG:-.user-config.json}"
+# User config file path (mounted from host at /workspaces/.claude-mac-env/.user-config.json)
+# Fall back to parent directory if not found at mounted location
+USER_CONFIG="${USER_CONFIG:-/workspaces/.claude-mac-env/.user-config.json}"
+if [[ ! -f "$USER_CONFIG" ]]; then
+  USER_CONFIG=".user-config.json"
+fi
 
 # Source the interface to get helper functions and defaults
 if [[ ! -f "$SCRIPT_DIR/secrets-interface.sh" ]]; then
@@ -42,6 +46,13 @@ get_provider_from_config() {
 
 # Main bootstrap logic
 main() {
+  # Check for jq availability
+  if ! command -v jq &>/dev/null; then
+    echo "warning: jq is required but not installed" >&2
+    echo "note: container startup continuing without secrets" >&2
+    return 0
+  fi
+
   local provider_name
   provider_name=$(get_provider_from_config)
 

@@ -72,8 +72,7 @@ assert_output_contains() {
 assert_output_contains "describe returns correct text" "Read secrets from macOS Keychain" \
     bash -c "source '$INTERFACE_SCRIPT' && source '$PROVIDER_SCRIPT' && secrets_describe"
 
-# Test 2: secrets_validate() succeeds when security command exists
-# The security command is always available on macOS
+# Test 2: secrets_validate() succeeds when security command exists and accounts configured
 mkdir -p "$TEMP_DIR/mock_bin"
 export PATH="$TEMP_DIR/mock_bin:$PATH"
 
@@ -81,7 +80,8 @@ cat > "$TEST_CONFIG_FILE" <<EOF
 {
   "secrets": {
     "provider": "keychain",
-    "keychainService": "claude-env"
+    "keychainService": "claude-env",
+    "keychainAccounts": ["API_KEY", "DB_URL"]
   }
 }
 EOF
@@ -93,14 +93,15 @@ exit 0
 EOF
 chmod +x "$TEMP_DIR/mock_bin/security"
 
-assert_success "validate succeeds when security command exists and service configured" \
+assert_success "validate succeeds when security command exists, service and accounts configured" \
     bash -c "export USER_CONFIG='$TEST_CONFIG_FILE' && source '$INTERFACE_SCRIPT' && source '$PROVIDER_SCRIPT' && secrets_validate"
 
 # Test 3: secrets_validate() fails when service not configured
 cat > "$TEST_CONFIG_FILE" <<EOF
 {
   "secrets": {
-    "provider": "keychain"
+    "provider": "keychain",
+    "keychainAccounts": ["API_KEY"]
   }
 }
 EOF
@@ -108,11 +109,7 @@ EOF
 assert_failure "validate fails when keychain service not configured" \
     bash -c "export USER_CONFIG='$TEST_CONFIG_FILE' && source '$INTERFACE_SCRIPT' && source '$PROVIDER_SCRIPT' && secrets_validate"
 
-# Test 4: secrets_validate() fails when security command not found
-# We'll skip this test on systems where security is always found
-# The check for security command is present but hard to test realistically
-
-# Test 5: secrets_inject() writes export format from keychain
+# Test 4: secrets_validate() fails when accounts not configured
 cat > "$TEST_CONFIG_FILE" <<EOF
 {
   "secrets": {
@@ -122,49 +119,62 @@ cat > "$TEST_CONFIG_FILE" <<EOF
 }
 EOF
 
+assert_failure "validate fails when keychain accounts not configured" \
+    bash -c "export USER_CONFIG='$TEST_CONFIG_FILE' && source '$INTERFACE_SCRIPT' && source '$PROVIDER_SCRIPT' && secrets_validate"
+
+# Test 5: secrets_inject() writes export format from keychain using account list
+cat > "$TEST_CONFIG_FILE" <<EOF
+{
+  "secrets": {
+    "provider": "keychain",
+    "keychainService": "claude-env",
+    "keychainAccounts": ["API_KEY", "DB_URL"]
+  }
+}
+EOF
+
 # Create mock security that simulates keychain with secrets
 cat > "$TEMP_DIR/mock_bin/security" <<'EOF'
 #!/bin/bash
 if [[ "$1" == "find-generic-password" ]]; then
-    # Simple argument check
-    if [[ "$@" == *"API_KEY"* && "$@" == *"-w"* ]]; then
+    # Fetch secret by service and account
+    if [[ "$@" == *"-s"*"claude-env"* && "$@" == *"-a"*"API_KEY"* && "$@" == *"-w"* ]]; then
         echo "secret123"
         exit 0
-    elif [[ "$@" == *"DB_URL"* && "$@" == *"-w"* ]]; then
+    elif [[ "$@" == *"-s"*"claude-env"* && "$@" == *"-a"*"DB_URL"* && "$@" == *"-w"* ]]; then
         echo "postgres://localhost/test"
-        exit 0
-    elif [[ "$@" == *"API_KEY"* ]]; then
-        echo "password: \"secret123\""
-        exit 0
-    elif [[ "$@" == *"DB_URL"* ]]; then
-        echo "password: \"postgres://localhost/test\""
         exit 0
     fi
     exit 1
-fi
-
-if [[ "$1" == "dump-keychain" ]]; then
-    # Simulate keychain dump with two accounts under service claude-env
-    cat <<'KEYCHAIN'
-generic password "secret123" service: "claude-env" account: "API_KEY"
-generic password "postgres://localhost/test" service: "claude-env" account: "DB_URL"
-KEYCHAIN
-    exit 0
 fi
 
 exit 1
 EOF
 chmod +x "$TEMP_DIR/mock_bin/security"
 
-assert_success "inject creates output file with secrets from keychain" \
+assert_success "inject creates output file with secrets from keychain account list" \
     bash -c "export USER_CONFIG='$TEST_CONFIG_FILE' && export SECRETS_OUTPUT_PATH='$TEST_OUTPUT_FILE' && source '$INTERFACE_SCRIPT' && source '$PROVIDER_SCRIPT' && secrets_inject && test -f '$TEST_OUTPUT_FILE'"
 
-# Test 6: secrets_inject() reads secrets from keychain correctly
-assert_output_contains "output contains API_KEY" "API_KEY=secret123" \
+# Test 6: secrets_inject() reads secrets from keychain correctly and quotes values
+assert_output_contains "output contains API_KEY with quotes" 'API_KEY="secret123"' \
     cat "$TEST_OUTPUT_FILE"
 
-assert_output_contains "output contains DB_URL" "DB_URL=postgres" \
+assert_output_contains "output contains DB_URL with quotes" 'DB_URL="postgres' \
     cat "$TEST_OUTPUT_FILE"
+
+# Test 7: secrets_inject() handles empty accounts gracefully
+cat > "$TEST_CONFIG_FILE" <<EOF
+{
+  "secrets": {
+    "provider": "keychain",
+    "keychainService": "claude-env",
+    "keychainAccounts": []
+  }
+}
+EOF
+
+assert_success "inject handles empty accounts list gracefully" \
+    bash -c "export USER_CONFIG='$TEST_CONFIG_FILE' && export SECRETS_OUTPUT_PATH='$TEST_OUTPUT_FILE' && source '$INTERFACE_SCRIPT' && source '$PROVIDER_SCRIPT' && secrets_inject && test -f '$TEST_OUTPUT_FILE'"
 
 # Summary
 echo ""

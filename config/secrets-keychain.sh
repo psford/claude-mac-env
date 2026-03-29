@@ -11,18 +11,25 @@
 #
 # Configuration (in .user-config.json):
 #   secrets.keychainService: Service name in Keychain (all secrets stored under this service)
+#   secrets.keychainAccounts: Array of account names to fetch from Keychain
 #
 # Usage: Add secrets to Keychain with:
 #   security add-generic-password -s "claude-env" -a "API_KEY" -w "value"
 
 set -euo pipefail
 
+# Check for jq availability
+if ! command -v jq &>/dev/null; then
+  echo "error: jq is required but not installed" >&2
+  return 1 2>/dev/null || exit 1
+fi
+
 # Describe this provider for the setup menu
 secrets_describe() {
     echo "Read secrets from macOS Keychain"
 }
 
-# Validate that security command exists and service is configured
+# Validate that security command exists, service is configured, and accounts are listed
 # Returns 0 if valid, 1 if not (with error message to stderr)
 secrets_validate() {
     # Check if security command exists (always present on macOS)
@@ -46,14 +53,23 @@ secrets_validate() {
         return 1
     fi
 
+    # Check that accounts array is configured and not empty
+    local accounts
+    accounts=$(jq -r '.secrets.keychainAccounts[]? // empty' "${USER_CONFIG:-.user-config.json}" 2>/dev/null)
+
+    if [[ -z "$accounts" ]]; then
+        echo "error: secrets.keychainAccounts not configured in user config" >&2
+        return 1
+    fi
+
     return 0
 }
 
 # Inject secrets from macOS Keychain into $SECRETS_OUTPUT_PATH
-# Uses security find-generic-password to read secrets
+# Fetches secrets from keychain using account names listed in config
 # Service name acts as namespace - secrets stored under one service with different account names
 secrets_inject() {
-    # Read config file to get service name
+    # Read config file to get service name and accounts
     if [[ ! -f "${USER_CONFIG:-.user-config.json}" ]]; then
         echo "error: user config file not found: ${USER_CONFIG:-.user-config.json}" >&2
         return 1
@@ -73,18 +89,19 @@ secrets_inject() {
     # Create temporary file to avoid partial writes
     local temp_output
     temp_output=$(mktemp)
+    # shellcheck disable=SC2064
     trap "rm -f '$temp_output'" RETURN
 
-    # Get list of accounts from Keychain for this service
-    # Using security dump-keychain to list all accounts for the service
+    # Get list of accounts from config array
     local accounts
-    accounts=$(security dump-keychain 2>/dev/null | grep "service: \"$service_name\"" | sed -E 's/.*account: "([^"]+)".*/\1/' || true)
+    accounts=$(jq -r '.secrets.keychainAccounts[]? // empty' "${USER_CONFIG:-.user-config.json}" 2>/dev/null)
 
     if [[ -z "$accounts" ]]; then
-        # No secrets found - create empty file
+        # No accounts configured - create empty file
         mkdir -p "$(dirname "$output_path")"
         touch "$temp_output"
         mv "$temp_output" "$output_path"
+        chmod 600 "$output_path"
         return 0
     fi
 
@@ -97,14 +114,17 @@ secrets_inject() {
         password=$(security find-generic-password -s "$service_name" -a "$account_name" -w 2>/dev/null || true)
 
         if [[ -n "$password" ]]; then
-            # Write as export statement
-            echo "export ${account_name}=${password}" >> "$temp_output"
+            # Escape any embedded double quotes in the value
+            password="${password//\"/\\\"}"
+            # Write as export statement with quoted value to preserve spaces
+            echo "export ${account_name}=\"${password}\"" >> "$temp_output"
         fi
     done <<< "$accounts"
 
     # Move temp file to final location
     mkdir -p "$(dirname "$output_path")"
     mv "$temp_output" "$output_path"
+    chmod 600 "$output_path"
 
     return 0
 }

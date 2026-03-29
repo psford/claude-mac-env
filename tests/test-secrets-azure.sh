@@ -175,11 +175,11 @@ chmod +x "$TEMP_DIR/mock_bin/az"
 assert_success "inject creates output file with secrets" \
     bash -c "export USER_CONFIG='$TEST_CONFIG_FILE' && export SECRETS_OUTPUT_PATH='$TEST_OUTPUT_FILE' && source '$INTERFACE_SCRIPT' && source '$PROVIDER_SCRIPT' && secrets_inject && test -f '$TEST_OUTPUT_FILE'"
 
-# Test 7: secrets_inject() converts kebab-case to UPPER_SNAKE_CASE
-assert_output_contains "output contains API_KEY" "API_KEY=secret123" \
+# Test 7: secrets_inject() converts kebab-case to UPPER_SNAKE_CASE and quotes values
+assert_output_contains "output contains API_KEY with quotes" 'API_KEY="secret123"' \
     cat "$TEST_OUTPUT_FILE"
 
-assert_output_contains "output contains DB_URL" "DB_URL=postgres" \
+assert_output_contains "output contains DB_URL with quotes" 'DB_URL="postgres' \
     cat "$TEST_OUTPUT_FILE"
 
 # Summary

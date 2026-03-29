@@ -107,8 +107,8 @@ assert_success "validate succeeds for existing file" \
 assert_success "inject creates output file" \
     bash -c "export USER_CONFIG='$TEST_CONFIG_FILE' && export SECRETS_OUTPUT_PATH='$TEST_OUTPUT_FILE' && source '$INTERFACE_SCRIPT' && source '$PROVIDER_SCRIPT' && secrets_inject && test -f '$TEST_OUTPUT_FILE'"
 
-# Test 5: secrets_inject() converts to export format
-assert_output_contains "output contains export API_KEY" "export API_KEY=test123" \
+# Test 5: secrets_inject() converts to export format with quoted values
+assert_output_contains "output contains export API_KEY with quotes" 'export API_KEY="test123"' \
     cat "$TEST_OUTPUT_FILE"
 
 # Test 6: secrets_inject() skips comments
@@ -126,7 +126,7 @@ bash -c "export USER_CONFIG='$TEST_CONFIG_FILE' && export SECRETS_OUTPUT_PATH='$
 assert_success "output has no comment lines" \
     bash -c "! grep '^#' '$TEST_OUTPUT_FILE'"
 
-# Test 7: secrets_inject() preserves existing exports
+# Test 7: secrets_inject() preserves existing exports with quotes
 cat > "$TEST_ENV_FILE" <<'EOF'
 export API_KEY=test123
 DATABASE_URL=postgres://localhost/test
@@ -135,8 +135,8 @@ EOF
 rm -f "$TEST_OUTPUT_FILE"
 bash -c "export USER_CONFIG='$TEST_CONFIG_FILE' && export SECRETS_OUTPUT_PATH='$TEST_OUTPUT_FILE' && source '$INTERFACE_SCRIPT' && source '$PROVIDER_SCRIPT' && secrets_inject" >/dev/null 2>&1
 
-assert_success "preserves existing exports" \
-    bash -c "grep '^export API_KEY=test123' '$TEST_OUTPUT_FILE'"
+assert_success "preserves existing exports with quotes" \
+    bash -c "grep '^export API_KEY=\"test123\"' '$TEST_OUTPUT_FILE'"
 
 # Test 8: secrets_inject() handles quoted values
 cat > "$TEST_ENV_FILE" <<'EOF'

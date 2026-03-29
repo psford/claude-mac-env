@@ -10,6 +10,12 @@
 
 set -euo pipefail
 
+# Check for jq availability
+if ! command -v jq &>/dev/null; then
+  echo "error: jq is required but not installed" >&2
+  return 1 2>/dev/null || exit 1
+fi
+
 # Describe this provider for the setup menu
 secrets_describe() {
     echo "Read secrets from a .env file on the Mac"
@@ -71,6 +77,7 @@ secrets_inject() {
     # Create temporary file to avoid partial writes
     local temp_output
     temp_output=$(mktemp)
+    # shellcheck disable=SC2064
     trap "rm -f '$temp_output'" RETURN
 
     # Process .env file: convert to export format, skip comments and empty lines
@@ -89,12 +96,23 @@ secrets_inject() {
             line="export $line"
         fi
 
-        echo "$line" >> "$temp_output"
+        # Extract variable name and value, quote the value to preserve spaces and special chars
+        if [[ "$line" =~ ^[[:space:]]*export[[:space:]]+([^=]+)=(.*)$ ]]; then
+            local var_name="${BASH_REMATCH[1]}"
+            local var_value="${BASH_REMATCH[2]}"
+            # Escape any embedded double quotes in the value
+            var_value="${var_value//\"/\\\"}"
+            echo "export ${var_name}=\"${var_value}\"" >> "$temp_output"
+        else
+            # Fallback: just echo the line as-is if pattern doesn't match
+            echo "$line" >> "$temp_output"
+        fi
     done < "$env_file_path"
 
     # Move temp file to final location
     mkdir -p "$(dirname "$output_path")"
     mv "$temp_output" "$output_path"
+    chmod 600 "$output_path"
 
     return 0
 }
