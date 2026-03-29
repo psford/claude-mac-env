@@ -5,6 +5,10 @@
     "context": ".."
   },
   "remoteUser": "claude",
+  "features": {
+    "./features/claude-skills": {},
+    "./features/universal-hooks": {}
+  },
   "mounts": [
     "source=${localEnv:HOME}/.gitconfig,target=/home/claude/.gitconfig,type=bind,readonly",
     "source=${localEnv:HOME}/.ssh,target=/home/claude/.ssh,type=bind,readonly"
