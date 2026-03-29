@@ -1,0 +1,17 @@
+{
+  "id": "csharp-tools",
+  "version": "1.0.0",
+  "name": "C# / .NET Development Tools",
+  "description": "Installs .NET SDK, Entity Framework migration hooks, and C# development helpers",
+  "options": {
+    "dotnetVersion": {
+      "type": "string",
+      "proposals": ["9.0", "8.0", "10.0"],
+      "default": "9.0",
+      "description": ".NET SDK version to install"
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/psford/claude-mac-env/universal-hooks"
+  ]
+}
