@@ -188,7 +188,7 @@ check_docker() {
     info "Docker Desktop is required for the development container."
     if ask_yn "Install Docker Desktop?"; then
         info "Installing Docker Desktop via Homebrew (this may take a few minutes)..."
-        if brew install --cask docker; then
+        if brew install --cask docker-desktop; then
             info "Docker installed, verifying binary..."
         else
             error "Docker Desktop installation failed"
