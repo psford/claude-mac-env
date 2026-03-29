@@ -18,8 +18,7 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "anthropics.claude-code",
-        {{EXTRA_EXTENSIONS}}
+        "anthropics.claude-code"{{EXTRA_EXTENSIONS}}
       ]
     }
   },

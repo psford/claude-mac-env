@@ -565,7 +565,7 @@ render_devcontainer() {
     # Build extra extensions based on selected features
     local extra_extensions=""
     if echo "$selected_features" | jq -e '.["csharp-tools"]' >/dev/null 2>&1; then
-        extra_extensions=$'\n        '"\"ms-dotnettools.csharp\""
+        extra_extensions=","$'\n        '"\"ms-dotnettools.csharp\""
     fi
 
     # Replace placeholders in template
