@@ -188,7 +188,7 @@ check_docker() {
     info "Docker Desktop is required for the development container."
     if ask_yn "Install Docker Desktop?"; then
         info "Installing Docker Desktop via Homebrew (this may take a few minutes)..."
-        if brew install --cask docker --no-quarantine; then
+        if brew install --cask docker; then
             info "Docker installed, verifying binary..."
         else
             error "Docker Desktop installation failed"
@@ -302,7 +302,7 @@ check_vscode() {
     info "VS Code is recommended but optional for the best development experience."
     if ask_yn "Install VS Code?"; then
         info "Installing VS Code via Homebrew (this may take a few minutes)..."
-        if brew install --cask visual-studio-code --no-quarantine; then
+        if brew install --cask visual-studio-code; then
             info "VS Code installed, verifying..."
         else
             warn "VS Code installation failed, continuing without it"
