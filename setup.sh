@@ -289,6 +289,89 @@ check_docker() {
 check_xcode_clt
 echo ""
 
+# VS Code preflight check (non-blocking)
+VSCODE_INSTALLED=false
+
+check_vscode() {
+    info "Checking VS Code..."
+
+    # Check if code command exists in PATH
+    if command -v code &>/dev/null; then
+        local vscode_version
+        vscode_version=$(code --version | head -n1)
+        success "VS Code already installed: $vscode_version"
+        VSCODE_INSTALLED=true
+        return 0
+    fi
+
+    # Check common VS Code locations
+    if [[ -x /usr/local/bin/code ]]; then
+        local vscode_version
+        vscode_version=$(/usr/local/bin/code --version | head -n1)
+        success "VS Code found at /usr/local/bin"
+        VSCODE_INSTALLED=true
+        return 0
+    fi
+
+    if [[ -x /Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code ]]; then
+        local vscode_version
+        vscode_version=$(/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --version | head -n1)
+        success "VS Code found at /Applications"
+        VSCODE_INSTALLED=true
+        return 0
+    fi
+
+    # VS Code not found - ask for permission (non-blocking)
+    info "VS Code is recommended but optional for the best development experience."
+    if ask_yn "Install VS Code?"; then
+        info "Installing VS Code via Homebrew (this may take a few minutes)..."
+        if brew install --cask visual-studio-code --no-quarantine; then
+            info "VS Code installed, verifying..."
+        else
+            warn "VS Code installation failed, continuing without it"
+            return 0
+        fi
+
+        # Verify binary exists and try to link it
+        if ! command -v code &>/dev/null; then
+            info "Attempting to link VS Code binary..."
+
+            # Find VS Code in common locations
+            local vscode_path="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+            if [[ -x "$vscode_path" ]]; then
+                if brew link visual-studio-code 2>/dev/null; then
+                    success "VS Code linked via brew"
+                else
+                    # Manual symlink as fallback
+                    warn "Brew link failed, symlinking manually..."
+                    mkdir -p /usr/local/bin
+                    if ln -sf "$vscode_path" /usr/local/bin/code; then
+                        success "VS Code manually symlinked to /usr/local/bin/code"
+                    else
+                        warn "Failed to symlink VS Code binary, continuing anyway"
+                        return 0
+                    fi
+                fi
+            fi
+        fi
+
+        if command -v code &>/dev/null; then
+            success "VS Code installation verified"
+            VSCODE_INSTALLED=true
+        else
+            warn "VS Code binary could not be found, continuing without it"
+        fi
+        return 0
+    else
+        info "Skipping VS Code. You can install later and use 'Reopen in Container' to connect."
+        return 0
+    fi
+}
+
 # Call Docker check
 check_docker
+echo ""
+
+# Call VS Code check
+check_vscode
 echo ""
