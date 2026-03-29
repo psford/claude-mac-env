@@ -319,8 +319,7 @@ check_vscode() {
                 else
                     # Manual symlink as fallback
                     warn "Brew link failed, symlinking manually..."
-                    mkdir -p /usr/local/bin
-                    if ln -sf "$vscode_path" /usr/local/bin/code; then
+                    if sudo mkdir -p /usr/local/bin && sudo ln -sf "$vscode_path" /usr/local/bin/code; then
                         success "VS Code manually symlinked to /usr/local/bin/code"
                     else
                         warn "Failed to symlink VS Code binary, continuing anyway"
@@ -401,8 +400,7 @@ check_gh_cli() {
                     else
                         # Manual symlink as fallback per friction log
                         warn "Brew link failed, symlinking manually..."
-                        mkdir -p /usr/local/bin
-                        if ln -sf "$gh_path" /usr/local/bin/gh; then
+                        if sudo mkdir -p /usr/local/bin && sudo ln -sf "$gh_path" /usr/local/bin/gh; then
                             success "gh manually symlinked to /usr/local/bin/gh"
                         else
                             error "Failed to symlink gh binary"
