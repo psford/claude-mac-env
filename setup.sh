@@ -32,7 +32,9 @@ ask_yn() {
             response="${response:-n}"
         fi
 
-        case "${response,,}" in
+        # Convert to lowercase for bash 3.2 compatibility
+        response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
+        case "$response" in
             y|yes)
                 return 0
                 ;;
@@ -527,8 +529,10 @@ render_devcontainer() {
     local base_image
     base_image=$(jq -r '.baseImage' "$config_file")
 
-    local project_dirs
-    mapfile -t project_dirs < <(jq -r '.projectDirs[]' "$config_file" 2>/dev/null || echo "")
+    local project_dirs=()
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && project_dirs+=("$line")
+    done < <(jq -r '.projectDirs[]' "$config_file" 2>/dev/null || echo "")
 
     local selected_features
     selected_features=$(jq '.features' "$config_file")
@@ -599,7 +603,9 @@ select_features() {
         selected_features=$(jq -n '{
             "claude-skills": {}
         }')
-        jq ".features = $selected_features" "$config_file" > /tmp/config.tmp && mv /tmp/config.tmp "$config_file"
+        local tmpfile
+        tmpfile=$(mktemp)
+        jq ".features = $selected_features" "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
         echo ""
         return 0
     fi
@@ -614,7 +620,9 @@ select_features() {
             "csharp-tools": {"dotnetVersion": "9.0"},
             "psford-personal": {"installAzureCli": true}
         }')
-        jq ".features = $selected_features" "$config_file" > /tmp/config.tmp && mv /tmp/config.tmp "$config_file"
+        local tmpfile
+        tmpfile=$(mktemp)
+        jq ".features = $selected_features" "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
         success "All Features enabled for psford"
         echo ""
         return 0
@@ -650,7 +658,7 @@ select_features() {
 
     for language in $languages; do
         local feature_name
-        feature_name=$(echo "$manifest" | jq -r ".tools[] | select(.tier == \"language\" and .language == \"$language\") | .feature" | head -1)
+        feature_name=$(echo "$manifest" | jq -r --arg lang "$language" '.tools[] | select(.tier == "language" and .language == $lang) | .feature' | head -1)
 
         if [[ -z "$feature_name" ]]; then
             continue
@@ -658,7 +666,7 @@ select_features() {
 
         # Build language-specific description from tools
         local tools_desc
-        tools_desc=$(echo "$manifest" | jq -r ".tools[] | select(.tier == \"language\" and .language == \"$language\") | \"  • \\(.description)\"" | tr '\n' '\n')
+        tools_desc=$(echo "$manifest" | jq -r --arg lang "$language" '.tools[] | select(.tier == "language" and .language == $lang) | "  • \(.description)"')
 
         case "$language" in
             csharp)
@@ -666,6 +674,7 @@ select_features() {
                 echo "$tools_desc"
                 if ask_yn "Install $language tools?"; then
                     local dotnet_version="9.0"
+                    local version_input
                     read -p "  .NET version (default 9.0): " -r version_input
                     dotnet_version="${version_input:-9.0}"
                     selected_features=$(echo "$selected_features" | jq --arg ver "$dotnet_version" '. += {"csharp-tools": {"dotnetVersion": $ver}}')
@@ -677,7 +686,7 @@ select_features() {
                 info "$language tools available:"
                 echo "$tools_desc"
                 if ask_yn "Install $language tools?"; then
-                    selected_features=$(echo "$selected_features" | jq ". += {\"$feature_name\": {}}")
+                    selected_features=$(echo "$selected_features" | jq --arg fname "$feature_name" '. += {($fname): {}}')
                     success "$language tools selected"
                 fi
                 ;;
@@ -689,7 +698,9 @@ select_features() {
     # (Intentionally omitted)
 
     # Store selections in config
-    jq ".features = $selected_features" "$config_file" > /tmp/config.tmp && mv /tmp/config.tmp "$config_file"
+    local tmpfile
+    tmpfile=$(mktemp)
+    jq ".features = $selected_features" "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
     success "Features configuration saved"
     echo ""
 }
@@ -757,7 +768,9 @@ collect_user_input() {
     # If no new dirs entered, use previous defaults
     if [[ ${#project_dirs[@]} -eq 0 ]] && [[ "$default_project_dirs" != "[]" ]]; then
         project_dirs=()
-        mapfile -t project_dirs < <(echo "$default_project_dirs" | jq -r '.[]')
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && project_dirs+=("$line")
+        done < <(echo "$default_project_dirs" | jq -r '.[]')
         info "Using previous project directories"
     fi
 
@@ -964,7 +977,7 @@ build_and_launch() {
     success "Setup complete!"
     echo ""
     echo "To start your environment:"
-    echo "  1. Open VS Code: code /path/to/claude-mac-env"
+    echo "  1. Open VS Code: code $(pwd)"
     echo "  2. When prompted, click \"Reopen in Container\""
     echo "  3. Wait for the container to build (first time only)"
     echo ""
