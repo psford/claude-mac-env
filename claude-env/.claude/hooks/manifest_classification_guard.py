@@ -18,11 +18,10 @@ Acceptance Criteria:
 """
 
 import json
-import os
 import sys
 import subprocess
 from pathlib import Path
-from typing import Optional, Dict, List, Set
+from typing import Dict, Set
 
 
 def get_manifest_path() -> Path:
@@ -160,7 +159,7 @@ def classify_tool(file_path: str, content: str) -> Dict:
         feature = "universal-hooks"
 
     # Check for language-specific indicators
-    if "csharp" in path_lower or ".net" in path_lower or "dotnet" in path_lower or "ef_" in path_lower:
+    if "csharp" in path_lower or "dotnet" in path_lower or "ef_" in path_lower:
         tier = "language"
         language = "csharp"
         feature = "csharp-tools"
@@ -170,7 +169,7 @@ def classify_tool(file_path: str, content: str) -> Dict:
         language = "powershell"
     elif "javascript" in path_lower or "typescript" in path_lower:
         language = "javascript"
-    elif "csharp" in content_lower or "dotnet" in content_lower or ".net" in content_lower:
+    elif "csharp" in content_lower or "dotnet" in content_lower or "using System" in content or "Microsoft." in content:
         if tier != "universal":
             tier = "language"
             language = "csharp"
@@ -195,7 +194,7 @@ def classify_tool(file_path: str, content: str) -> Dict:
 
     # Fallback descriptions based on file name
     base_name = Path(file_path).stem.lower()
-    if not description.startswith("Tool:"):
+    if description.startswith("Tool:"):
         if "test" in base_name:
             description = f"Testing utility for {base_name.replace('_', ' ')}"
         elif "check" in base_name:
