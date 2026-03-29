@@ -507,6 +507,236 @@ check_gh_cli() {
     fi
 }
 
+# Select secrets provider
+select_secrets_provider() {
+    info "Selecting secrets provider..."
+    echo ""
+
+    local config_file=".user-config.json"
+
+    # Get previous selection if available
+    local previous_provider=""
+    if [[ -f "$config_file" ]]; then
+        previous_provider=$(jq -r '.secrets.provider // ""' "$config_file" 2>/dev/null || echo "")
+    fi
+
+    # Display menu
+    echo "How should secrets be managed?"
+    echo "  1) .env file (simple, secrets on disk)"
+    echo "  2) Azure Key Vault (requires az CLI)"
+    echo "  3) macOS Keychain (native, no file on disk)"
+    echo "  4) Skip (no secrets management)"
+    echo ""
+
+    [[ -n "$previous_provider" ]] && info "Previous choice: $previous_provider"
+
+    local provider_choice
+    while true; do
+        read -p "Choice (1-4) [4]: " -r provider_choice
+        provider_choice="${provider_choice:-4}"
+
+        case "$provider_choice" in
+            1)
+                # .env file provider
+                select_env_provider "$config_file"
+                return $?
+                ;;
+            2)
+                # Azure Key Vault provider
+                select_azure_provider "$config_file"
+                return $?
+                ;;
+            3)
+                # macOS Keychain provider
+                select_keychain_provider "$config_file"
+                return $?
+                ;;
+            4)
+                # Skip secrets
+                select_skip_provider "$config_file"
+                return $?
+                ;;
+            *)
+                warn "Invalid choice. Please enter 1-4"
+                ;;
+        esac
+    done
+}
+
+# Select .env file provider
+select_env_provider() {
+    local config_file="$1"
+
+    info "Setting up .env file provider..."
+
+    # Get previous path if available
+    local default_env_path=""
+    if [[ -f "$config_file" ]]; then
+        default_env_path=$(jq -r '.secrets.envFilePath // ""' "$config_file" 2>/dev/null || echo "")
+    fi
+
+    local env_file_path=""
+    while true; do
+        if [[ -n "$default_env_path" ]]; then
+            read -p "Path to .env file [$default_env_path]: " -r env_file_path
+            env_file_path="${env_file_path:-$default_env_path}"
+        else
+            read -p "Path to .env file: " -r env_file_path
+        fi
+
+        # Expand ~ to home directory
+        env_file_path="${env_file_path/#\~/$HOME}"
+
+        # Validate file exists
+        if [[ ! -f "$env_file_path" ]]; then
+            warn "File does not exist: $env_file_path"
+            continue
+        fi
+
+        # Validate file is readable
+        if [[ ! -r "$env_file_path" ]]; then
+            warn "File is not readable: $env_file_path"
+            continue
+        fi
+
+        success "Using .env file: $env_file_path"
+        break
+    done
+
+    # Update config
+    local tmpfile
+    tmpfile=$(mktemp)
+    jq ".secrets.provider = \"env\" | .secrets.envFilePath = \"$env_file_path\"" "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
+    success "Secrets provider configured: .env file"
+    echo ""
+}
+
+# Select Azure Key Vault provider
+select_azure_provider() {
+    local config_file="$1"
+
+    info "Setting up Azure Key Vault provider..."
+
+    # Check if az CLI is installed
+    if ! command -v az &>/dev/null; then
+        warn "Azure CLI (az) is not installed"
+        if ask_yn "Install Azure CLI?"; then
+            info "Installing Azure CLI via Homebrew..."
+            if brew install azure-cli; then
+                success "Azure CLI installed"
+            else
+                error "Failed to install Azure CLI"
+                return 1
+            fi
+        else
+            error "Azure CLI is required for this provider"
+            return 1
+        fi
+    fi
+
+    success "Azure CLI verified"
+
+    # Check if az CLI is authenticated
+    info "Checking Azure authentication..."
+    if ! az account show &>/dev/null; then
+        warn "Azure CLI is not authenticated"
+        if ask_yn "Authenticate with Azure CLI?"; then
+            info "Run: az login"
+            if az login; then
+                success "Azure authentication successful"
+            else
+                error "Azure authentication failed"
+                return 1
+            fi
+        else
+            error "Azure CLI authentication is required for this provider"
+            return 1
+        fi
+    fi
+
+    success "Azure CLI authenticated"
+
+    # Get previous vault name if available
+    local default_vault_name=""
+    if [[ -f "$config_file" ]]; then
+        default_vault_name=$(jq -r '.secrets.azureVaultName // ""' "$config_file" 2>/dev/null || echo "")
+    fi
+
+    local vault_name=""
+    if [[ -n "$default_vault_name" ]]; then
+        read -p "Azure Key Vault name [$default_vault_name]: " -r vault_name
+        vault_name="${vault_name:-$default_vault_name}"
+    else
+        read -p "Azure Key Vault name: " -r vault_name
+    fi
+
+    # Update config
+    local tmpfile
+    tmpfile=$(mktemp)
+    jq ".secrets.provider = \"azure\" | .secrets.azureVaultName = \"$vault_name\"" "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
+    success "Secrets provider configured: Azure Key Vault ($vault_name)"
+    echo ""
+}
+
+# Select macOS Keychain provider
+select_keychain_provider() {
+    local config_file="$1"
+
+    info "Setting up macOS Keychain provider..."
+
+    # Check if security command exists (always on macOS)
+    if ! command -v security &>/dev/null; then
+        error "security command not found (required on macOS)"
+        return 1
+    fi
+
+    success "macOS security CLI verified"
+
+    # Get previous service name if available
+    local default_service_name=""
+    if [[ -f "$config_file" ]]; then
+        default_service_name=$(jq -r '.secrets.keychainService // ""' "$config_file" 2>/dev/null || echo "")
+    fi
+
+    local service_name=""
+    if [[ -n "$default_service_name" ]]; then
+        read -p "Keychain service name [$default_service_name]: " -r service_name
+        service_name="${service_name:-$default_service_name}"
+    else
+        read -p "Keychain service name: " -r service_name
+    fi
+
+    # Try to read from keychain to validate access
+    info "Validating Keychain access for service: $service_name"
+    if security find-generic-password -s "$service_name" &>/dev/null; then
+        success "Keychain service validated"
+    else
+        warn "Could not find any passwords for service: $service_name"
+        info "You can add secrets with: security add-generic-password -s \"$service_name\" -a \"KEY_NAME\" -w \"value\""
+    fi
+
+    # Update config
+    local tmpfile
+    tmpfile=$(mktemp)
+    jq ".secrets.provider = \"keychain\" | .secrets.keychainService = \"$service_name\"" "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
+    success "Secrets provider configured: macOS Keychain ($service_name)"
+    echo ""
+}
+
+# Skip secrets provider
+select_skip_provider() {
+    local config_file="$1"
+
+    info "Skipping secrets management..."
+
+    # Update config
+    local tmpfile
+    tmpfile=$(mktemp)
+    jq ".secrets.provider = \"none\"" "$config_file" > "$tmpfile" && mv "$tmpfile" "$config_file"
+    success "Secrets provider: none (skipped)"
+    echo ""
+}
+
 # Render devcontainer.json from template
 render_devcontainer() {
     info "Rendering devcontainer.json..."
@@ -560,6 +790,33 @@ render_devcontainer() {
     # Add comma before .gitconfig if there are project mounts
     if [[ -n "$project_mounts" ]]; then
         project_mounts="${project_mounts},"$'\n'
+    fi
+
+    # Build secrets-related mounts
+    local secrets_mounts=""
+
+    # Always add config/ mount (read-only) for provider scripts
+    secrets_mounts="    \"source=$(pwd)/config,target=/workspaces/.claude-mac-env/config,type=bind,readonly\""
+
+    # Add conditional mount for .env file if that provider is selected
+    local provider
+    provider=$(jq -r '.secrets.provider // ""' "$config_file" 2>/dev/null || echo "")
+
+    if [[ "$provider" == "env" ]]; then
+        local env_file_path
+        env_file_path=$(jq -r '.secrets.envFilePath // ""' "$config_file" 2>/dev/null || echo "")
+        if [[ -n "$env_file_path" ]]; then
+            secrets_mounts="${secrets_mounts},"$'\n'"    \"source=$env_file_path,target=/home/claude/.env,type=bind,readonly\""
+        fi
+    fi
+
+    # Add comma after project mounts if we have secrets mounts
+    if [[ -n "$secrets_mounts" ]]; then
+        if [[ -n "$project_mounts" ]]; then
+            project_mounts="${project_mounts}${secrets_mounts}"
+        else
+            project_mounts="${secrets_mounts},"$'\n'
+        fi
     fi
 
     # Build extra extensions based on selected features
@@ -1002,6 +1259,7 @@ main() {
     run_preflight || exit 1
     collect_user_input || exit 1
     select_features || exit 1
+    select_secrets_provider || exit 1
     render_devcontainer || exit 1
     build_and_launch || exit 1
 }
