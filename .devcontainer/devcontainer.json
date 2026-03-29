@@ -7,7 +7,9 @@
   "remoteUser": "claude",
   "features": {
     "./features/claude-skills": {},
-    "./features/universal-hooks": {}
+    "./features/universal-hooks": {},
+    "./features/csharp-tools": { "dotnetVersion": "9.0" },
+    "./features/psford-personal": { "installAzureCli": true }
   },
   "mounts": [
     "source=${localEnv:HOME}/.gitconfig,target=/home/claude/.gitconfig,type=bind,readonly",
