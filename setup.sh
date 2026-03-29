@@ -108,6 +108,18 @@ check_homebrew() {
             # Add to PATH for current session
             eval "$(/opt/homebrew/bin/brew shellenv)"
 
+            # Persist to shell profile so brew is in PATH on future terminals
+            local shell_profile=""
+            if [[ -n "${ZSH_VERSION:-}" ]] || [[ "$SHELL" == */zsh ]]; then
+                shell_profile="$HOME/.zprofile"
+            else
+                shell_profile="$HOME/.bash_profile"
+            fi
+            if [[ -n "$shell_profile" ]] && ! grep -q '/opt/homebrew/bin/brew shellenv' "$shell_profile" 2>/dev/null; then
+                echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$shell_profile"
+                success "Added Homebrew to $shell_profile"
+            fi
+
             # Verify installation
             if brew --version &>/dev/null; then
                 success "Homebrew installed successfully"
