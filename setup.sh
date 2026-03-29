@@ -1301,7 +1301,7 @@ build_and_launch() {
     base_image=$(jq -r '.baseImage' "$config_file")
 
     # Build Docker image
-    if docker build --build-arg "BASE_IMAGE=$base_image" -t claude-mac-env:latest .; then
+    if docker build --no-cache --build-arg "BASE_IMAGE=$base_image" -t claude-mac-env:latest .; then
         success "Docker image built successfully"
     else
         error "Failed to build Docker image"
