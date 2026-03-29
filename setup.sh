@@ -52,21 +52,6 @@ echo "Claude Mac Environment Setup v0.1.0"
 echo "=========================================="
 echo ""
 
-# Check for Apple Silicon
-info "Checking system architecture..."
-ARCH=$(uname -m)
-
-if [[ "$ARCH" != "arm64" ]]; then
-    error "This setup requires Apple Silicon (arm64)."
-    error "Detected architecture: $ARCH"
-    error "Claude Mac Environment is designed for Apple Silicon Macs."
-    error "For Intel Macs, please refer to the manual setup guide."
-    exit 1
-fi
-
-success "Apple Silicon detected (arm64)"
-echo ""
-
 # Homebrew preflight check
 check_homebrew() {
     info "Checking Homebrew..."
@@ -536,14 +521,115 @@ check_gh_cli() {
     fi
 }
 
-# Call VS Code check
-check_vscode
-echo ""
+# Run all preflight checks in sequence
+run_preflight() {
+    info "Running preflight checks..."
+    echo ""
 
-# Call Dev Containers extension check
-check_devcontainers_extension
-echo ""
+    # Architecture check (hard stop if Intel)
+    ARCH=$(uname -m)
+    if [[ "$ARCH" != "arm64" ]]; then
+        error "This setup requires Apple Silicon (arm64)."
+        error "Detected architecture: $ARCH"
+        error "Claude Mac Environment is designed for Apple Silicon Macs."
+        error "For Intel Macs, please refer to the manual setup guide."
+        return 1
+    fi
+    success "Apple Silicon detected (arm64)"
+    echo ""
 
-# Call gh CLI check
-check_gh_cli
-echo ""
+    # Homebrew check (hard stop if fails)
+    check_homebrew || return 1
+    echo ""
+
+    # Xcode CLT check (hard stop if fails)
+    check_xcode_clt || return 1
+    echo ""
+
+    # Docker check (hard stop if fails)
+    check_docker || return 1
+    echo ""
+
+    # VS Code check (non-blocking)
+    check_vscode
+    echo ""
+
+    # Dev Containers extension check (only if VS Code installed)
+    check_devcontainers_extension
+    echo ""
+
+    # gh CLI check (hard stop if fails)
+    check_gh_cli || return 1
+    echo ""
+
+    # Print summary
+    print_summary
+}
+
+# Print summary of installed tools
+print_summary() {
+    echo "=========================================="
+    success "Preflight complete. All dependencies installed:"
+    echo ""
+
+    # Get versions
+    local homebrew_version
+    homebrew_version=$(brew --version | head -n1)
+
+    local docker_version
+    docker_version=$(docker --version 2>/dev/null || echo "not installed")
+
+    local vscode_version
+    if [[ "$VSCODE_INSTALLED" == "true" ]]; then
+        vscode_version=$(code --version 2>/dev/null | head -n1 || echo "installed")
+    else
+        vscode_version="skipped"
+    fi
+
+    local devcontainers_status
+    if [[ "$VSCODE_INSTALLED" == "true" && $(code --list-extensions 2>/dev/null | grep -c "ms-vscode-remote.remote-containers" || echo 0) -gt 0 ]]; then
+        devcontainers_status="installed"
+    elif [[ "$VSCODE_INSTALLED" != "true" ]]; then
+        devcontainers_status="skipped"
+    else
+        devcontainers_status="not installed"
+    fi
+
+    local gh_version
+    gh_version=$(gh --version 2>/dev/null || echo "not installed")
+
+    local git_identity
+    local git_name
+    local git_email
+    git_name=$(git config --global user.name || echo "")
+    git_email=$(git config --global user.email || echo "")
+    if [[ -n "$git_name" && -n "$git_email" ]]; then
+        git_identity="$git_name <$git_email>"
+    else
+        git_identity="not configured"
+    fi
+
+    echo "  • Homebrew: $homebrew_version"
+    echo "  • Docker Desktop: $docker_version"
+    echo "  • VS Code: $vscode_version"
+    echo "  • Dev Containers extension: $devcontainers_status"
+    echo "  • GitHub CLI: $gh_version"
+    echo "  • Git identity: $git_identity"
+    echo ""
+    echo "=========================================="
+}
+
+# Main entry point
+main() {
+    # Check for --preflight-only flag
+    if [[ "${1:-}" == "--preflight-only" ]]; then
+        run_preflight
+        exit $?
+    fi
+
+    # Run full preflight
+    run_preflight
+}
+
+# Run main function
+main "$@"
