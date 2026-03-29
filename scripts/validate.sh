@@ -20,12 +20,18 @@ FAIL=0
 check() {
   local name="$1"
   local cmd="$2"
+  local stderr
+
+  stderr=$(eval "${cmd}" 2>&1 >/dev/null) || true
 
   if eval "${cmd}" >/dev/null 2>&1; then
     echo -e "${GREEN}✓${NC} ${name}"
     ((PASS++))
   else
     echo -e "${RED}✗${NC} ${name}"
+    if [[ -n "${stderr}" ]]; then
+      echo "  Error: ${stderr}"
+    fi
     ((FAIL++))
   fi
 }
@@ -97,7 +103,7 @@ check "Hook files present" \
 
 # Check for manifest (if available)
 check "Tooling manifest present" \
-  "docker run --rm -v ${PROJECT_DIR}:/workspace claude-mac-env:validate '[[ -f /workspace/tooling-manifest.json ]] && echo OK || false'"
+  "docker run --rm -v ${PROJECT_DIR}:/workspace claude-mac-env:validate bash -c '[[ -f /workspace/claude-env/tooling-manifest.json ]] && echo OK || false'"
 
 echo
 echo "=== Summary ==="

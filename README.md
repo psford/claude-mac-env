@@ -82,7 +82,6 @@ Your files are mounted into the container with different permissions:
 | Project | `./` | `/workspaces/claude-mac-env` | Read-Write | Your working directory |
 | Git config | `~/.gitconfig` | `~/.gitconfig` | Read-Only | Identity and auth config |
 | SSH keys | `~/.ssh` | `~/.ssh` | Read-Only | GitHub and other SSH keys |
-| Home dotfiles | `~/.config`, `~/.bashrc`, etc. | Same | Read-Only | Shell config and preferences |
 | Everything else | Mac filesystem | Not mounted | None | Sandboxed — container can't access |
 
 ## Customizing tooling

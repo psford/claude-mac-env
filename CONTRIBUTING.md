@@ -13,8 +13,7 @@ Each Feature lives in `features/<feature-name>/`:
 ```
 features/universal-hooks/
 ├── devcontainer-feature.json
-├── install.sh
-└── README.md
+└── install.sh
 ```
 
 ### devcontainer-feature.json schema
@@ -50,7 +49,7 @@ Every Feature must include a `devcontainer-feature.json` manifest:
 
 ### install.sh requirements
 
-The `install.sh` script runs inside the container as the non-root `claude` user:
+The `install.sh` script runs inside the container as root (the default for Dev Container Features):
 
 ```bash
 #!/bin/bash
@@ -155,7 +154,7 @@ The commit hook `manifest_classification_guard.py` automatically proposes manife
 5. It proposes a manifest entry for your review
 6. You accept or edit the proposal before committing
 
-See the hook itself at `.claude/hooks/manifest_classification_guard.py` for implementation details.
+See the hook itself at `claude-env/.claude/hooks/manifest_classification_guard.py` for implementation details.
 
 ## Modifying setup.sh
 
