@@ -28,11 +28,14 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user with sudo access
+# Ubuntu 24.04 ships with a 'ubuntu' user at UID/GID 1000 — remove it first
 ARG USERNAME=claude
 ARG USER_UID=1000
 ARG USER_GID=${USER_UID}
-RUN groupadd --gid ${USER_GID} ${USERNAME} 2>/dev/null || true \
-    && useradd --uid ${USER_UID} --gid ${USER_GID} -m -s /bin/bash ${USERNAME} 2>/dev/null || true \
+RUN userdel -r ubuntu 2>/dev/null || true \
+    && groupdel ubuntu 2>/dev/null || true \
+    && groupadd --gid ${USER_GID} ${USERNAME} \
+    && useradd --uid ${USER_UID} --gid ${USER_GID} -m -s /bin/bash ${USERNAME} \
     && echo "${USERNAME} ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} \
     && chmod 0440 /etc/sudoers.d/${USERNAME}
 
