@@ -883,10 +883,11 @@ render_devcontainer() {
         fi
     fi
 
-    # Add comma after project mounts if we have secrets mounts
+    # Add secrets mounts after project mounts, ensure trailing comma
+    # (the template has .gitconfig and .ssh mounts hardcoded after {{PROJECT_MOUNTS}})
     if [[ -n "$secrets_mounts" ]]; then
         if [[ -n "$project_mounts" ]]; then
-            project_mounts="${project_mounts}${secrets_mounts}"
+            project_mounts="${project_mounts}${secrets_mounts},"$'\n'
         else
             project_mounts="${secrets_mounts},"$'\n'
         fi
