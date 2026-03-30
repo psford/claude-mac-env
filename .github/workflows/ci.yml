@@ -31,3 +31,37 @@ jobs:
         run: |
           docker build -t claude-mac-env:validate .
           bash scripts/validate.sh
+
+  feature-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Feature install.sh for forbidden auth commands
+        run: |
+          FORBIDDEN_PATTERNS=(
+            "gh auth"
+            "az login"
+            "GITHUB_TOKEN"
+            "git clone"
+          )
+          FAILED=0
+
+          for install_script in features/*/install.sh; do
+            for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+              if grep -qn "$pattern" "$install_script"; then
+                echo "FORBIDDEN: '${pattern}' found in ${install_script}:"
+                grep -n "$pattern" "$install_script"
+                FAILED=$((FAILED + 1))
+              fi
+            done
+          done
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo ""
+            echo "ERROR: Feature install.sh files must not contain auth-dependent commands."
+            echo "Auth belongs in config/bootstrap.sh (postCreateCommand), not in Features."
+            exit 1
+          fi
+
+          echo "✓ All Feature install.sh files are auth-free."
