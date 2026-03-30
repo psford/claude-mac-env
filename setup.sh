@@ -691,11 +691,14 @@ select_azure_provider() {
             if az login; then
                 success "Azure authentication successful"
             else
-                error "Azure authentication failed"
+                warn "Azure authentication failed"
+                info "This may be due to MFA requirements, blocked tenants, or expired subscriptions."
+                info "You can try again later with: az login --tenant TENANT_ID"
+                info "Skipping Azure Key Vault for now."
                 return 1
             fi
         else
-            error "Azure CLI authentication is required for this provider"
+            info "Skipping Azure Key Vault provider"
             return 1
         fi
     fi
