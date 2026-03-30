@@ -17,6 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Validate dependencies before doing anything
 if [[ -f "$SCRIPT_DIR/validate-dependencies.sh" ]]; then
+  # shellcheck disable=SC1091
   source "$SCRIPT_DIR/validate-dependencies.sh"
   echo ""
   echo "=== Pre-bootstrap dependency check ==="
@@ -43,7 +44,7 @@ if [[ ! -f "$SCRIPT_DIR/secrets-interface.sh" ]]; then
   exit 0
 fi
 
-# shellcheck disable=SC1090
+# shellcheck disable=SC1090,SC1091
 source "$SCRIPT_DIR/secrets-interface.sh"
 
 # Read provider name from user config

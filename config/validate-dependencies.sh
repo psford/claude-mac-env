@@ -81,8 +81,7 @@ validate_ssh_github() {
     echo ""
     echo "SSH to GitHub:"
     # Try with a writable known_hosts location if the mounted one is read-only
-    local ssh_opts="-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=3"
-    if timeout 5 ssh $ssh_opts -T git@github.com 2>&1 | grep -qi "successfully authenticated"; then
+    if timeout 5 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=3 -T git@github.com 2>&1 | grep -qi "successfully authenticated"; then
         echo "  ✓ SSH to github.com works"
         return 0
     else

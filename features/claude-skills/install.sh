@@ -102,9 +102,9 @@ fi
 
 # Step 7: Verify skills are installed
 echo "Verifying installed skills..."
-if [ "$(ls -A ${SKILLS_DIR})" ]; then
-    echo "Successfully installed $(ls -1 ${SKILLS_DIR} | wc -l) skill(s):"
-    ls -1 "${SKILLS_DIR}" | sed 's/^/  - /'
+if [ "$(ls -A "${SKILLS_DIR}")" ]; then
+    echo "Successfully installed $(find "${SKILLS_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l) skill(s):"
+    find "${SKILLS_DIR}" -mindepth 1 -maxdepth 1 -type d -printf '  - %f\n' | sort
 else
     echo "Warning: No skills were installed. Check repository structure."
 fi
