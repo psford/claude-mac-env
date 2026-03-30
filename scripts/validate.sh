@@ -26,13 +26,13 @@ check() {
 
   if eval "${cmd}" >/dev/null 2>&1; then
     echo -e "${GREEN}✓${NC} ${name}"
-    ((PASS++))
+    PASS=$((PASS + 1))
   else
     echo -e "${RED}✗${NC} ${name}"
     if [[ -n "${stderr}" ]]; then
       echo "  Error: ${stderr}"
     fi
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
   fi
 }
 
@@ -50,10 +50,10 @@ echo
 echo "Building Docker image..."
 if docker build -t claude-mac-env:validate "${PROJECT_DIR}" >/dev/null 2>&1; then
   echo -e "${GREEN}✓${NC} Docker image builds"
-  ((PASS++))
+  PASS=$((PASS + 1))
 else
   echo -e "${RED}✗${NC} Docker image builds"
-  ((FAIL++))
+  FAIL=$((FAIL + 1))
   echo "Build failed. Exiting."
   exit 1
 fi
