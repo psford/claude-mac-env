@@ -38,7 +38,7 @@ for ext in "${!EXTENSIONS[@]}"; do
 done
 
 # Warn if commit touches many unrelated files
-if [ $FILE_COUNT -gt $FILE_THRESHOLD ]; then
+if [ "$FILE_COUNT" -gt "$FILE_THRESHOLD" ]; then
     echo "Warning: This commit touches $FILE_COUNT files (threshold: $FILE_THRESHOLD)"
     echo ""
     echo "Breakdown by file type:"

@@ -8,6 +8,7 @@ INTERFACE_SCRIPT="/private/tmp/claude-mac-env/config/secrets-interface.sh"
 TEMP_DIR=$(mktemp -d)
 TEST_CONFIG_FILE="$TEMP_DIR/config.json"
 
+# shellcheck disable=SC2317
 cleanup() {
     rm -rf "$TEMP_DIR" 2>/dev/null || true
 }
@@ -35,6 +36,7 @@ assert_success() {
     fi
 }
 
+# shellcheck disable=SC2317
 assert_failure() {
     local test_name="$1"
     shift

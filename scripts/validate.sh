@@ -36,7 +36,8 @@ check() {
   fi
 }
 
-# Helper to run command in container
+# Helper to run command in container (called indirectly via check())
+# shellcheck disable=SC2317
 run_in_container() {
   local cmd="$1"
   docker run --rm claude-mac-env:validate bash -c "${cmd}"
@@ -117,7 +118,7 @@ check "AC3.1: Project dirs writable (RW mount)" \
 
 # AC3.2: Mount a temp file RO, assert write fails
 TEST_RO_FILE=$(mktemp)
-trap "rm -f $TEST_RO_FILE" EXIT
+trap 'rm -f $TEST_RO_FILE' EXIT
 check "AC3.2: RO mount prevents writes" \
   "docker run --rm -v $TEST_RO_FILE:/home/claude/.gitconfig:ro bash -c '! (echo x >> /home/claude/.gitconfig 2>&1 | grep -q .)' 2>&1 | grep -qi 'read.only\|permission'"
 

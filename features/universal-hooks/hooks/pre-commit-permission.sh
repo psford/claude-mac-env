@@ -34,8 +34,9 @@ echo "  Message: $COMMIT_MSG"
 echo ""
 
 # Get list of files to be committed
-if [ $FILE_COUNT -le 5 ]; then
+if [ "$FILE_COUNT" -le 5 ]; then
     echo "Files being committed:"
+    # shellcheck disable=SC2001
     echo "$STAGED_FILES" | sed 's/^/    /'
 else
     echo "Files being committed (first 5 of $FILE_COUNT):"
@@ -45,7 +46,7 @@ fi
 
 echo ""
 echo "To bypass this check, use: git commit --no-verify"
-read -p "Proceed with commit? (type 'yes' to confirm): " confirm
+read -rp "Proceed with commit? (type 'yes' to confirm): " confirm
 
 if [ "$confirm" != "yes" ]; then
     echo "Commit cancelled."

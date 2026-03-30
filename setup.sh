@@ -116,6 +116,7 @@ check_homebrew() {
                 shell_profile="$HOME/.bash_profile"
             fi
             if [[ -n "$shell_profile" ]] && ! grep -q '/opt/homebrew/bin/brew shellenv' "$shell_profile" 2>/dev/null; then
+                # shellcheck disable=SC2016
                 echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$shell_profile"
                 success "Added Homebrew to $shell_profile"
             fi

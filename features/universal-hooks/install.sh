@@ -45,7 +45,7 @@ echo ""
 echo "Universal Git & Claude Hooks installed successfully!"
 echo ""
 echo "Hooks installed:"
-ls -1 "${HOOKS_INSTALL_DIR}" | sed 's/^/  - /'
+find "${HOOKS_INSTALL_DIR}" -mindepth 1 -maxdepth 1 -printf '  - %f\n' | sort
 echo ""
 echo "These hooks will be invoked automatically by git during repository operations."
 echo "To bypass any hook, use: git <command> --no-verify"

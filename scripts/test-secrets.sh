@@ -95,7 +95,7 @@ echo ""
 # Test 5: AC7.5 - Verify .user-config.json persists across rebuilds
 echo "Running AC7.5: Configuration persistence test..."
 TEMP_DIR=$(mktemp -d)
-trap "rm -rf '$TEMP_DIR'" EXIT
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
 TEST_CONFIG="${TEMP_DIR}/.user-config.json"
 jq -n '{secrets: {provider: "env"}}' > "$TEST_CONFIG"

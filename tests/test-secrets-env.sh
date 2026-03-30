@@ -10,6 +10,7 @@ TEST_ENV_FILE="$TEMP_DIR/test.env"
 TEST_OUTPUT_FILE="$TEMP_DIR/secrets.env"
 TEST_CONFIG_FILE="$TEMP_DIR/config.json"
 
+# shellcheck disable=SC2317
 cleanup() {
     rm -rf "$TEMP_DIR" 2>/dev/null || true
 }

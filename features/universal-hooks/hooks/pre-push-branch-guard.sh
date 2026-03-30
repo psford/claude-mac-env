@@ -23,7 +23,7 @@ for protected in "${PROTECTED_BRANCHES[@]}"; do
         echo "Warning: You are about to push to protected branch '$BRANCH'"
         echo ""
         echo "To bypass this check, use: git push --no-verify"
-        read -p "Are you sure you want to push to '$BRANCH'? (type 'yes' to confirm): " confirm
+        read -rp "Are you sure you want to push to '$BRANCH'? (type 'yes' to confirm): " confirm
 
         if [ "$confirm" != "yes" ]; then
             echo "Push cancelled."
