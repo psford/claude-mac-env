@@ -127,3 +127,45 @@ jobs:
             exit 1
           fi
           echo "✓ All external references valid"
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [lint, build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test config
+        run: |
+          cat > .user-config.json <<'EOF'
+          {
+            "githubUser": "ci-test",
+            "projectDirs": [],
+            "baseImage": "ubuntu:24.04",
+            "features": {
+              "claude-skills": {},
+              "universal-hooks": {}
+            },
+            "secrets": {
+              "provider": "none"
+            }
+          }
+          EOF
+
+      - name: Render devcontainer.json for test
+        run: |
+          source config/lib/tools.sh
+          render_devcontainer_json .user-config.json .devcontainer/devcontainer.json.template .devcontainer/devcontainer.json
+
+      - name: Build container
+        run: docker build -t claude-mac-env:e2e .
+
+      - name: Run bootstrap and verify postconditions
+        run: |
+          docker run --rm \
+            -v "$(pwd)/config:/workspaces/.claude-mac-env/config:ro" \
+            -v "$(pwd)/scripts:/workspaces/.claude-mac-env/scripts:ro" \
+            -v "$(pwd)/.user-config.json:/workspaces/.claude-mac-env/.user-config.json:ro" \
+            -e CLAUDE_CODE=1 \
+            -e BOOTSTRAP_MOCK_AUTH=1 \
+            claude-mac-env:e2e \
+            bash -c "bash /workspaces/.claude-mac-env/config/bootstrap.sh && bash /workspaces/.claude-mac-env/scripts/test-e2e-bootstrap.sh"

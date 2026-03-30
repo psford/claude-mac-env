@@ -89,6 +89,11 @@ step_check_tools() {
 step_github_auth() {
     step_header 2 "Connecting to GitHub"
 
+    if [[ "${BOOTSTRAP_MOCK_AUTH:-}" == "1" ]]; then
+        step_skip "Auth skipped (mock mode)"
+        return 0
+    fi
+
     local auth_result
     auth_result=$(check_gh_auth 2>/dev/null) || {
         local err_result
@@ -147,6 +152,10 @@ step_github_auth() {
 step_azure_auth() {
     local github_user="$1"
     local secrets_provider="${2:-}"
+
+    if [[ "${BOOTSTRAP_MOCK_AUTH:-}" == "1" ]]; then
+        return 0
+    fi
 
     # Determine if Azure is needed
     local azure_needed=false

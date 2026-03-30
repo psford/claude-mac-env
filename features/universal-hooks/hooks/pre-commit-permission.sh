@@ -6,8 +6,8 @@
 
 set -e
 
-# Skip in non-interactive contexts (CI, automated processes)
-if [ ! -t 0 ]; then
+# Skip in non-interactive contexts (CI, automated processes, Claude Code)
+if [ ! -t 0 ] || [ "${CLAUDE_CODE:-}" = "1" ]; then
     exit 0
 fi
 
