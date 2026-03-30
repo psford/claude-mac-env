@@ -4,13 +4,12 @@
     "dockerfile": "../Dockerfile",
     "context": "..",
     "args": {
-      "BASE_IMAGE": "{{BASE_IMAGE}}"
+      "BASE_IMAGE": "ubuntu:24.04"
     }
   },
   "remoteUser": "claude",
-  "features": {{FEATURES}},
+  "features": {},
   "mounts": [
-    {{PROJECT_MOUNTS}}
     "source=${localEnv:HOME}/.gitconfig,target=/home/claude/.gitconfig,type=bind,readonly",
     "source=${localEnv:HOME}/.ssh,target=/home/claude/.ssh,type=bind,readonly"
   ],
@@ -18,7 +17,7 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "anthropics.claude-code"{{EXTRA_EXTENSIONS}}
+        "anthropics.claude-code"
       ]
     }
   },

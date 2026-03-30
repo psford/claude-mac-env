@@ -806,7 +806,7 @@ select_skip_provider() {
     echo ""
 }
 
-# Render devcontainer.json from template
+# Render devcontainer.json from template using jq (Layer 1 tool)
 render_devcontainer() {
     info "Rendering devcontainer.json..."
     echo ""
@@ -815,102 +815,25 @@ render_devcontainer() {
     local template_file=".devcontainer/devcontainer.json.template"
     local output_file=".devcontainer/devcontainer.json"
 
-    # Read template
     if [[ ! -f "$template_file" ]]; then
         error "Template file not found: $template_file"
         return 1
     fi
 
-    local template
-    template=$(cat "$template_file")
-
-    # Extract values from config
-    local base_image
-    base_image=$(jq -r '.baseImage' "$config_file")
-
-    local project_dirs=()
-    while IFS= read -r line; do
-        [[ -n "$line" ]] && project_dirs+=("$line")
-    done < <(jq -r '.projectDirs[]' "$config_file" 2>/dev/null || echo "")
-
-    local selected_features
-    selected_features=$(jq '.features' "$config_file")
-
-    # Build features JSON with GHCR URLs
-    local features_json
-    features_json=$(echo "$selected_features" | jq 'to_entries | map({("ghcr.io/psford/claude-mac-env/\(.key):latest"): .value}) | add')
-
-    # Build project mounts
-    local project_mounts=""
-    for dir in "${project_dirs[@]}"; do
-        if [[ -z "$dir" ]]; then
-            continue
-        fi
-        # Extract directory name from path
-        local dirname
-        dirname=$(basename "$dir")
-        # Add mount entry
-        if [[ -n "$project_mounts" ]]; then
-            project_mounts="${project_mounts},"$'\n'
-        fi
-        project_mounts="${project_mounts}    \"source=$dir,target=/workspaces/$dirname,type=bind\""
-    done
-
-    # Add comma before .gitconfig if there are project mounts
-    if [[ -n "$project_mounts" ]]; then
-        project_mounts="${project_mounts},"$'\n'
+    # Source the Layer 1 tool if not already loaded
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if ! type render_devcontainer_json &>/dev/null; then
+        # shellcheck source=config/lib/tools.sh
+        source "${script_dir}/config/lib/tools.sh"
     fi
 
-    # Build secrets-related mounts
-    local secrets_mounts=""
-
-    # Always add config/ mount (read-only) for provider scripts
-    secrets_mounts="    \"source=$(pwd)/config,target=/workspaces/.claude-mac-env/config,type=bind,readonly\""
-
-    # Always mount .user-config.json for bootstrap-secrets.sh to access
-    local config_path
-    config_path="$(cd "$(dirname "$config_file")" && pwd)/$(basename "$config_file")"
-    secrets_mounts="${secrets_mounts},"$'\n'"    \"source=${config_path},target=/workspaces/.claude-mac-env/.user-config.json,type=bind,readonly\""
-
-    # Add conditional mount for .env file if that provider is selected
-    local provider
-    provider=$(jq -r '.secrets.provider // ""' "$config_file" 2>/dev/null || echo "")
-
-    if [[ "$provider" == "env" ]]; then
-        local env_file_path
-        env_file_path=$(jq -r '.secrets.envFilePath // ""' "$config_file" 2>/dev/null || echo "")
-        if [[ -n "$env_file_path" ]]; then
-            secrets_mounts="${secrets_mounts},"$'\n'"    \"source=$env_file_path,target=/home/claude/.env,type=bind,readonly\""
-        fi
+    if render_devcontainer_json "$config_file" "$template_file" "$output_file" "$(pwd)"; then
+        success "Generated $output_file"
+    else
+        error "Failed to render $output_file"
+        return 1
     fi
-
-    # Add secrets mounts after project mounts, ensure trailing comma
-    # (the template has .gitconfig and .ssh mounts hardcoded after {{PROJECT_MOUNTS}})
-    if [[ -n "$secrets_mounts" ]]; then
-        if [[ -n "$project_mounts" ]]; then
-            project_mounts="${project_mounts}${secrets_mounts},"$'\n'
-        else
-            project_mounts="${secrets_mounts},"$'\n'
-        fi
-    fi
-
-    # Build extra extensions based on selected features
-    local extra_extensions=""
-    if echo "$selected_features" | jq -e '.["csharp-tools"]' >/dev/null 2>&1; then
-        extra_extensions=","$'\n        '"\"ms-dotnettools.csharp\""
-    fi
-
-    # Replace placeholders in template
-    local rendered
-    rendered="$template"
-    rendered="${rendered//\{\{BASE_IMAGE\}\}/$base_image}"
-    rendered="${rendered//\{\{FEATURES\}\}/$features_json}"
-    rendered="${rendered//\{\{PROJECT_MOUNTS\}\}/$project_mounts}"
-    rendered="${rendered//\{\{EXTRA_EXTENSIONS\}\}/$extra_extensions}"
-
-    # Write output
-    echo "$rendered" > "$output_file"
-    success "Generated $output_file"
     echo ""
 }
 

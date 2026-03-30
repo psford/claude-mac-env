@@ -219,6 +219,97 @@ fix_symlink() {
     ensure_exit_zero "symlink target responds" "$target" --version
 }
 
+# Render devcontainer.json from template using jq
+# All JSON manipulation via jq — zero bash string concatenation for JSON content.
+render_devcontainer_json() {
+    local config_path="$1"
+    local template_path="$2"
+    local output_path="$3"
+    local repo_dir="${4:-$(pwd)}"
+
+    require_file "$config_path"
+    require_file "$template_path"
+    require_command jq
+
+    # Read config values
+    local base_image
+    base_image=$(jq -r '.baseImage // "ubuntu:24.04"' "$config_path")
+
+    # Build features object: map feature names to GHCR URLs
+    local features_json
+    features_json=$(jq '
+        .features // {} | to_entries |
+        map({("ghcr.io/psford/claude-mac-env/\(.key):latest"): .value}) |
+        if length > 0 then add else {} end
+    ' "$config_path")
+
+    # Build project mounts array
+    local project_mounts
+    project_mounts=$(jq -r '
+        [.projectDirs // [] | .[] |
+         "source=\(.),target=/workspaces/\(split("/") | last),type=bind"]
+    ' "$config_path")
+
+    # Build secrets-related mounts
+    local config_abs_path
+    config_abs_path=$(cd "$(dirname "$config_path")" && pwd)/$(basename "$config_path")
+    local config_dir_abs
+    config_dir_abs="$repo_dir/config"
+
+    local secrets_mounts
+    secrets_mounts=$(jq -n \
+        --arg config_dir "$config_dir_abs" \
+        --arg config_file "$config_abs_path" \
+        '[
+            "source=\($config_dir),target=/workspaces/.claude-mac-env/config,type=bind,readonly",
+            "source=\($config_file),target=/workspaces/.claude-mac-env/.user-config.json,type=bind,readonly"
+        ]')
+
+    # Conditionally add .env file mount
+    local provider
+    provider=$(jq -r '.secrets.provider // ""' "$config_path")
+    if [ "$provider" = "env" ]; then
+        local env_file_path
+        env_file_path=$(jq -r '.secrets.envFilePath // ""' "$config_path")
+        if [ -n "$env_file_path" ]; then
+            secrets_mounts=$(echo "$secrets_mounts" | jq --arg path "$env_file_path" \
+                '. + ["source=\($path),target=/home/claude/.env,type=bind,readonly"]')
+        fi
+    fi
+
+    # Build extensions array
+    local extra_extensions
+    extra_extensions=$(jq '
+        if .features["csharp-tools"] then
+            ["anthropics.claude-code", "ms-dotnettools.csharp"]
+        else
+            ["anthropics.claude-code"]
+        end
+    ' "$config_path")
+
+    # Assemble the final JSON using the template as base
+    local output_dir
+    output_dir=$(dirname "$output_path")
+    mkdir -p "$output_dir"
+
+    jq \
+        --arg base_image "$base_image" \
+        --argjson features "$features_json" \
+        --argjson project_mounts "$project_mounts" \
+        --argjson secrets_mounts "$secrets_mounts" \
+        --argjson extensions "$extra_extensions" \
+        '
+        .build.args.BASE_IMAGE = $base_image |
+        .features = $features |
+        .mounts = ($project_mounts + $secrets_mounts + [.mounts[] | select(contains("localEnv"))]) |
+        .customizations.vscode.extensions = $extensions
+        ' "$template_path" > "$output_path"
+
+    # Postconditions
+    ensure_file_exists "$output_path"
+    ensure_valid_json "$output_path"
+}
+
 # Load secrets using the existing provider architecture
 load_secrets() {
     local provider="$1"
