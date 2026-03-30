@@ -15,6 +15,21 @@ set -o pipefail
 # Script directory for sourcing other scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Validate dependencies before doing anything
+if [[ -f "$SCRIPT_DIR/validate-dependencies.sh" ]]; then
+  source "$SCRIPT_DIR/validate-dependencies.sh"
+  echo ""
+  echo "=== Pre-bootstrap dependency check ==="
+  validate_chain_core
+  validate_chain_secrets
+  if [[ $VALIDATION_ERRORS -gt 0 ]]; then
+    echo ""
+    echo "ERROR: $VALIDATION_ERRORS missing dependencies. Bootstrap cannot proceed."
+    echo "Run: bash $SCRIPT_DIR/validate-dependencies.sh  (for full report)"
+    exit 1
+  fi
+fi
+
 # User config file path (mounted from host at /workspaces/.claude-mac-env/.user-config.json)
 # Fall back to parent directory if not found at mounted location
 USER_CONFIG="${USER_CONFIG:-/workspaces/.claude-mac-env/.user-config.json}"
