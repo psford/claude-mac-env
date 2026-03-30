@@ -22,5 +22,5 @@
       ]
     }
   },
-  "postCreateCommand": "bash /workspaces/.claude-mac-env/config/bootstrap-secrets.sh || true"
+  "postCreateCommand": "bash /workspaces/.claude-mac-env/config/bootstrap.sh"
 }
