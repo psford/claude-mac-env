@@ -220,31 +220,26 @@ step_azure_auth() {
     done
 }
 
-step_install_skills() {
+step_install_plugins() {
     local github_user="$1"
-    step_header 4 "Installing skills"
+    step_header 4 "Installing plugins"
 
-    # Idempotency: check if skills are already installed
-    local skills_dir="${HOME}/.claude/skills"
-    mkdir -p "$skills_dir"
+    local marketplaces_dir="${HOME}/.claude/plugins/marketplaces"
 
-    local skill_count=0
-    if [ -d "$skills_dir" ]; then
-        skill_count=$(find "$skills_dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l) || true
-    fi
-
-    if [ "$skill_count" -gt 0 ] && [ -d "$skills_dir/brainstorming" ]; then
-        step_skip "Skills already installed (${skill_count} skills)"
+    # Idempotency: check if marketplaces are already cloned and plugins enabled
+    if [ -d "$marketplaces_dir/ed3d-plugins/.claude-plugin" ] \
+        && jq -e '.enabledPlugins["ed3d-plan-and-execute@ed3d-plugins"]' "${HOME}/.claude/settings.json" >/dev/null 2>&1; then
+        step_skip "Plugins already installed"
         return 0
     fi
 
-    # Clone and install ed3d-plugins
+    # ── ed3d-plugins marketplace ─────────────────────────────────────────
     local ed3d_url="https://github.com/ed3dai/ed3d-plugins.git"
     local ed3d_path=""
     while true; do
-        ed3d_path=$(clone_skills_repo "$ed3d_url" "ed3d-plugins" 2>/dev/null) && break
+        ed3d_path=$(install_marketplace "$ed3d_url" "ed3d-plugins" 2>/dev/null) && break
         local result
-        result=$(handle_error "clone_failed" "$ed3d_url" "step_install_skills")
+        result=$(handle_error "clone_failed" "$ed3d_url" "step_install_plugins")
         local action
         action=$(parse_action "$result")
         local message
@@ -256,34 +251,58 @@ step_install_skills() {
         echo "  ${message}"
     done
 
-    local ed3d_count
-    ed3d_count=$(install_skills "$ed3d_path" "$skills_dir" 2>/dev/null) || {
-        local result
-        result=$(handle_error "no_skills_found" "ed3d-plugins" "step_install_skills")
-        step_error "$(parse_message "$result")"
-        rm -rf "$(dirname "$ed3d_path")"
-        return 1
-    }
-    rm -rf "$(dirname "$ed3d_path")"
-    echo "  Installed ${ed3d_count} ed3d skills"
+    # Register the marketplace in settings.json
+    register_marketplace "ed3d-plugins" 2>/dev/null || true
 
-    # Clone and install psford/claude-config
-    local config_url="https://github.com/psford/claude-config.git"
-    local config_path=""
-    if config_path=$(clone_skills_repo "$config_url" "claude-config" 2>/dev/null); then
-        local config_count
-        config_count=$(install_skills "$config_path" "$skills_dir" 2>/dev/null) || true
-        if [ -n "$config_count" ] && [ "$config_count" -gt 0 ]; then
-            echo "  Installed ${config_count} psford skills"
-        fi
-        rm -rf "$(dirname "$config_path")"
-    else
-        echo "  Note: psford/claude-config not available — continuing with ed3d skills"
+    # Discover and enable all plugins from ed3d
+    local ed3d_plugins
+    ed3d_plugins=$(list_marketplace_plugins "$ed3d_path" 2>/dev/null) || true
+    if [ -n "$ed3d_plugins" ]; then
+        # shellcheck disable=SC2086
+        enable_plugins "ed3d-plugins" $ed3d_plugins 2>/dev/null || true
+        local count
+        count=$(echo "$ed3d_plugins" | wc -l)
+        echo "  Installed ${count} ed3d plugins"
     fi
 
-    local total
-    total=$(find "$skills_dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l) || true
-    step_done "Installed ${total} skills total"
+    # ── psford/claude-config (patricks-local marketplace) ────────────────
+    local config_url="https://github.com/psford/claude-config.git"
+    local config_path=""
+    if config_path=$(clone_repo "$config_url" "${HOME}/.claude/plugins/marketplaces/patricks-local-source" 2>/dev/null); then
+        # The marketplace content is under plugins/patricks-workflow/ etc.
+        # Copy the relevant plugin directories as a local marketplace
+        local patricks_mkt="$marketplaces_dir/patricks-local"
+        if [ -d "$config_path/plugins/patricks-workflow" ]; then
+            mkdir -p "$patricks_mkt/plugins"
+            cp -r "$config_path/plugins/patricks-workflow" "$patricks_mkt/plugins/" 2>/dev/null || true
+
+            # Create marketplace.json if not present
+            if [ ! -f "$patricks_mkt/.claude-plugin/marketplace.json" ]; then
+                mkdir -p "$patricks_mkt/.claude-plugin"
+                jq -n '{
+                    name: "patricks-local",
+                    version: "1.0.0",
+                    description: "Patrick'\''s personal workflow plugins",
+                    plugins: [{
+                        name: "patricks-workflow",
+                        description: "Patrick'\''s workflow skills and agents",
+                        version: "1.0.0",
+                        source: "./plugins/patricks-workflow"
+                    }]
+                }' > "$patricks_mkt/.claude-plugin/marketplace.json"
+            fi
+
+            register_marketplace "patricks-local" 2>/dev/null || true
+            enable_plugins "patricks-local" "patricks-workflow" 2>/dev/null || true
+            echo "  Installed patricks-workflow plugin"
+        fi
+        # Clean up the full clone, keep only what we extracted
+        rm -rf "$config_path"
+    else
+        echo "  Note: psford/claude-config not available — continuing with ed3d plugins"
+    fi
+
+    step_done "Plugins installed and registered"
 }
 
 step_configure_claude() {
@@ -434,7 +453,7 @@ main() {
         step_check_tools
         step_github_auth
         step_azure_auth "$github_user" "$secrets_provider"
-        step_install_skills "$github_user"
+        step_install_plugins "$github_user"
         step_configure_claude
         step_load_secrets "$secrets_provider" "$config_path"
     fi

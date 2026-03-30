@@ -110,11 +110,120 @@ run_az_login() {
     fi
 }
 
-# ── Skills tools ─────────────────────────────────────────────────────────────
+# ── Plugin/marketplace tools ─────────────────────────────────────────────────
 
-# Clone a skills repo to a temp directory
+# Clone a repo to a target directory (for marketplace installation)
 # Stdout: path to cloned directory
-# Caller is responsible for cleaning up the returned temp directory.
+clone_repo() {
+    local url="$1"
+    local target="$2"
+    require_command git
+    if [ -z "$url" ]; then
+        echo "clone_failed:url is empty" >&2
+        return 1
+    fi
+    # If target already exists and is a git repo, pull instead of clone
+    if [ -d "$target/.git" ]; then
+        if git -C "$target" pull --ff-only >/dev/null 2>&1; then
+            echo "$target"
+            return 0
+        fi
+    fi
+    mkdir -p "$(dirname "$target")"
+    if ! git clone --depth 1 "$url" "$target" 2>&1; then
+        echo "clone_failed:git clone failed for $url" >&2
+        return 1
+    fi
+    echo "$target"
+}
+
+# Install a marketplace by cloning it into ~/.claude/plugins/marketplaces/
+# Stdout: path to installed marketplace
+install_marketplace() {
+    local url="$1"
+    local name="$2"
+    local marketplaces_dir="${HOME}/.claude/plugins/marketplaces"
+    mkdir -p "$marketplaces_dir"
+    clone_repo "$url" "$marketplaces_dir/$name"
+}
+
+# Register a marketplace in settings.json so Claude Code discovers it
+# Adds to extraKnownMarketplaces with the correct container path
+register_marketplace() {
+    local name="$1"
+    local settings_path="${HOME}/.claude/settings.json"
+    local marketplace_path="${HOME}/.claude/plugins/marketplaces/${name}"
+
+    require_dir "$marketplace_path"
+    require_command jq
+
+    if [ ! -f "$settings_path" ]; then
+        echo '{}' > "$settings_path"
+    fi
+
+    local updated
+    updated=$(jq --arg name "$name" --arg path "$marketplace_path" '
+        .extraKnownMarketplaces[$name] = {
+            "source": {
+                "source": "directory",
+                "path": $path
+            }
+        }
+    ' "$settings_path") || {
+        echo "json_merge_failed:failed to register marketplace $name" >&2
+        return 1
+    }
+    echo "$updated" > "$settings_path"
+    ensure_valid_json "$settings_path"
+}
+
+# Enable plugins from a marketplace in settings.json
+# Takes a marketplace name and a list of plugin names
+enable_plugins() {
+    local marketplace="$1"
+    shift
+    local settings_path="${HOME}/.claude/settings.json"
+
+    require_command jq
+
+    if [ ! -f "$settings_path" ]; then
+        echo '{}' > "$settings_path"
+    fi
+
+    local updated
+    updated="$(cat "$settings_path")"
+    for plugin in "$@"; do
+        updated=$(echo "$updated" | jq --arg key "${plugin}@${marketplace}" '
+            .enabledPlugins[$key] = true
+        ') || {
+            echo "json_merge_failed:failed to enable plugin $plugin" >&2
+            return 1
+        }
+    done
+    echo "$updated" > "$settings_path"
+    ensure_valid_json "$settings_path"
+}
+
+# List plugins available in a marketplace
+# Stdout: newline-separated plugin names
+list_marketplace_plugins() {
+    local marketplace_path="$1"
+    require_dir "$marketplace_path"
+
+    local manifest="$marketplace_path/.claude-plugin/marketplace.json"
+    if [ -f "$manifest" ]; then
+        jq -r '.plugins[].name' "$manifest" 2>/dev/null
+    else
+        # Fallback: look for plugin.json in subdirectories
+        for plugin_dir in "$marketplace_path"/plugins/*/; do
+            if [ -f "$plugin_dir/.claude-plugin/plugin.json" ]; then
+                jq -r '.name' "$plugin_dir/.claude-plugin/plugin.json" 2>/dev/null
+            fi
+        done
+    fi
+}
+
+# Legacy: Clone a skills repo to a temp directory (kept for backward compat)
 clone_skills_repo() {
     local url="$1"
     local name="$2"
@@ -133,9 +242,7 @@ clone_skills_repo() {
     echo "$temp_dir/$name"
 }
 
-# Install skills from a source directory to a target directory
-# Finds plugins/*/skills/*/SKILL.md in source_dir, copies each skill dir to target_dir
-# Stdout: count of skills installed
+# Legacy: Install skills from a source directory to a target directory
 install_skills() {
     local source_dir="$1"
     local target_dir="$2"
