@@ -11,6 +11,7 @@ STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
 
 # Patterns to detect (CWE-117 log injection)
 # These are warning patterns, not necessarily blocking
+# shellcheck disable=SC2016
 LOG_INJECTION_PATTERNS=(
     'logger\..*\(\$'           # Variable interpolation in logger calls
     'console\.log\(\$'         # Variable in console.log

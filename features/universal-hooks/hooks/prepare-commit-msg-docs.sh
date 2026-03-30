@@ -6,8 +6,9 @@
 
 set -e
 
-# Get the commit message file
+# Get the commit message file (passed by git, available for future use)
 COMMIT_MSG_FILE="$1"
+export COMMIT_MSG_FILE
 
 # Get list of staged files
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)

@@ -12,6 +12,7 @@ set -euo pipefail
 # Check for jq availability
 if ! command -v jq &>/dev/null; then
   echo "error: jq is required but not installed" >&2
+  # shellcheck disable=SC2317
   return 1 2>/dev/null || exit 1
 fi
 

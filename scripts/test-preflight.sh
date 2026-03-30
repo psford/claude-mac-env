@@ -58,7 +58,7 @@ echo ""
 # AC1.4: Dev Containers extension auto-installed via code CLI
 # Placeholder test - requires VS Code to be installed
 echo "Testing AC1.4 - Dev Containers extension..."
-if command -v code &>/dev/null 2>/dev/null; then
+if command -v code &>/dev/null; then
     if code --list-extensions 2>/dev/null | grep -q "ms-vscode-remote.remote-containers"; then
         assert_test "AC1.4: Dev Containers extension installed" 0
     else
@@ -72,6 +72,7 @@ echo ""
 
 # AC1.5: Source setup.sh and verify run_preflight function exists
 echo "Testing AC1.5 - run_preflight function exists..."
+# shellcheck disable=SC1090
 if source "${SETUP_SCRIPT}" 2>/dev/null && declare -f run_preflight &>/dev/null; then
     assert_test "AC1.5: run_preflight function exists" 0
 else
@@ -103,6 +104,7 @@ echo ""
 
 # AC1.7: check_vscode returns 0 even when VS Code is not installed (non-blocking)
 echo "Testing AC1.7 - check_vscode is non-blocking..."
+# shellcheck disable=SC1090
 if source "${SETUP_SCRIPT}" 2>/dev/null && declare -f check_vscode &>/dev/null; then
     # check_vscode should always return 0 since it's non-blocking
     if check_vscode >/dev/null 2>&1; then

@@ -8,8 +8,10 @@ INTERFACE_SCRIPT="/private/tmp/claude-mac-env/config/secrets-interface.sh"
 TEMP_DIR=$(mktemp -d)
 TEST_OUTPUT_FILE="$TEMP_DIR/secrets.env"
 TEST_CONFIG_FILE="$TEMP_DIR/config.json"
-MOCK_SECURITY_SCRIPT="$TEMP_DIR/mock_security.sh"
+MOCK_SECURITY_SCRIPT="$TEMP_DIR/mock_security.sh"  # used in test cases below
+export MOCK_SECURITY_SCRIPT
 
+# shellcheck disable=SC2317
 cleanup() {
     rm -rf "$TEMP_DIR" 2>/dev/null || true
 }
