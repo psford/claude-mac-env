@@ -2,7 +2,7 @@
 # bootstrap.sh — Layer 3 orchestrator
 #
 # postCreateCommand entry point. Chains Layer 1 tools and Layer 2 error
-# handling into a 6-step guided flow. Each step is idempotent — if already
+# handling into a 7-step guided flow. Each step is idempotent — if already
 # done, prints ✓ and moves on. If killed and re-run, resumes from the
 # first incomplete step.
 #
@@ -21,7 +21,7 @@ source "${SCRIPT_DIR}/lib/errors.sh"
 
 # ── UX helpers ───────────────────────────────────────────────────────────────
 
-TOTAL_STEPS=6
+TOTAL_STEPS=7
 
 step_header() {
     local n="$1"
@@ -305,8 +305,50 @@ step_install_plugins() {
     step_done "Plugins installed and registered"
 }
 
+step_clone_workspace_repos() {
+    step_header 5 "Cloning workspace repos"
+
+    local config_path="${USER_CONFIG:-/workspaces/.claude-mac-env/.user-config.json}"
+
+    # Read workspaceRepos from config
+    local repos
+    repos=$(jq -r '.workspaceRepos // [] | .[]' "$config_path" 2>/dev/null) || true
+
+    if [ -z "$repos" ]; then
+        step_skip "No workspace repos configured"
+        return 0
+    fi
+
+    local cloned=0
+    local skipped=0
+    while IFS= read -r repo; do
+        local repo_name
+        repo_name=$(basename "$repo")
+        local target="/workspaces/${repo_name}"
+
+        if [ -d "$target/.git" ]; then
+            ((skipped++)) || true
+            continue
+        fi
+
+        local url="https://github.com/${repo}.git"
+        if clone_repo "$url" "$target" >/dev/null 2>&1; then
+            echo "  ✓ ${repo}"
+            ((cloned++)) || true
+        else
+            echo "  ✗ ${repo} — clone failed (will retry on next bootstrap run)"
+        fi
+    done <<< "$repos"
+
+    if [ "$skipped" -gt 0 ] && [ "$cloned" -eq 0 ]; then
+        step_skip "All ${skipped} repos already cloned"
+    elif [ "$cloned" -gt 0 ]; then
+        step_done "Cloned ${cloned} repos (${skipped} already present)"
+    fi
+}
+
 step_configure_claude() {
-    step_header 5 "Configuring Claude Code"
+    step_header 6 "Configuring Claude Code"
 
     local settings_path="${HOME}/.claude/settings.json"
     mkdir -p "${HOME}/.claude"
@@ -389,7 +431,7 @@ step_load_secrets() {
     local secrets_provider="$1"
     local config_path="$2"
 
-    step_header 6 "Loading secrets"
+    step_header 7 "Loading secrets"
 
     # Skip if no provider configured
     if [ -z "$secrets_provider" ] || [ "$secrets_provider" = "none" ] || [ "$secrets_provider" = "skip" ]; then
@@ -454,6 +496,7 @@ main() {
         step_github_auth
         step_azure_auth "$github_user" "$secrets_provider"
         step_install_plugins "$github_user"
+        step_clone_workspace_repos
         step_configure_claude
         step_load_secrets "$secrets_provider" "$config_path"
     fi
