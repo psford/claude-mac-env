@@ -130,7 +130,7 @@ clone_repo() {
         fi
     fi
     mkdir -p "$(dirname "$target")"
-    if ! git clone --depth 1 "$url" "$target" 2>&1; then
+    if ! git clone --depth 1 "$url" "$target" >/dev/null 2>&1; then
         echo "clone_failed:git clone failed for $url" >&2
         return 1
     fi
@@ -234,7 +234,7 @@ clone_skills_repo() {
     fi
     local temp_dir
     temp_dir=$(mktemp -d)
-    if ! git clone --depth 1 "$url" "$temp_dir/$name" 2>&1; then
+    if ! git clone --depth 1 "$url" "$temp_dir/$name" >/dev/null 2>&1; then
         rm -rf "$temp_dir"
         echo "clone_failed:git clone failed for $url" >&2
         return 1
