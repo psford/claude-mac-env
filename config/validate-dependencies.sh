@@ -204,8 +204,15 @@ validate_chain_external_refs() {
         if timeout 10 gh repo view "$repo" --json name &>/dev/null 2>&1; then
             echo "  ✓ $repo"
         else
-            echo "  ✗ $repo — NOT FOUND or inaccessible"
-            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+            # In CI the default GITHUB_TOKEN can only access the current repo.
+            # Treat inaccessible external repos as warnings, not errors.
+            if [[ -n "${CI:-}" ]]; then
+                echo "  ⚠ $repo — inaccessible (expected in CI without cross-repo token)"
+                VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
+            else
+                echo "  ✗ $repo — NOT FOUND or inaccessible"
+                VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+            fi
         fi
     done
 }
