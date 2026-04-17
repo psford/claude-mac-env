@@ -28,13 +28,13 @@ while IFS= read -r file; do
     if [ -z "$ext" ] || [ "$ext" = "$file" ]; then
         ext="(no extension)"
     fi
-    ((EXTENSIONS["$ext"]++))
+    ((EXTENSIONS["$ext"]++)) || true
 done <<< "$STAGED_FILES"
 
 # Count distinct extensions
 EXTENSION_COUNT=0
 for ext in "${!EXTENSIONS[@]}"; do
-    ((EXTENSION_COUNT++))
+    ((EXTENSION_COUNT++)) || true
 done
 
 # Warn if commit touches many unrelated files

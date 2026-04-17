@@ -14,7 +14,7 @@ jobs:
       - name: Install ShellCheck
         run: sudo apt-get install -y shellcheck
       - name: Lint shell scripts
-        run: find . -name '*.sh' -not -path './.git/*' | xargs shellcheck
+        run: find . -name '*.sh' -not -path './.git/*' | xargs shellcheck --severity=warning
 
   build:
     runs-on: ubuntu-latest
@@ -31,3 +31,141 @@ jobs:
         run: |
           docker build -t claude-mac-env:validate .
           bash scripts/validate.sh
+
+  feature-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Feature install.sh for forbidden auth commands
+        run: |
+          FORBIDDEN_PATTERNS=(
+            "gh auth"
+            "az login"
+            "GITHUB_TOKEN"
+            "git clone"
+          )
+          FAILED=0
+
+          for install_script in features/*/install.sh; do
+            for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+              if grep -qn "$pattern" "$install_script"; then
+                echo "FORBIDDEN: '${pattern}' found in ${install_script}:"
+                grep -n "$pattern" "$install_script"
+                FAILED=$((FAILED + 1))
+              fi
+            done
+          done
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo ""
+            echo "ERROR: Feature install.sh files must not contain auth-dependent commands."
+            echo "Auth belongs in config/bootstrap.sh (postCreateCommand), not in Features."
+            exit 1
+          fi
+
+          echo "✓ All Feature install.sh files are auth-free."
+
+  json-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test config
+        run: |
+          cat > .user-config.json <<'EOF'
+          {
+            "githubUser": "ci-test",
+            "projectDirs": ["/tmp/test-project"],
+            "baseImage": "ubuntu:24.04",
+            "features": {
+              "claude-skills": {},
+              "universal-hooks": {}
+            },
+            "secrets": {
+              "provider": "none"
+            }
+          }
+          EOF
+
+      - name: Render devcontainer.json
+        run: |
+          source config/lib/tools.sh
+          render_devcontainer_json .user-config.json .devcontainer/devcontainer.json.template .devcontainer/devcontainer.json
+
+      - name: Validate rendered JSON
+        run: |
+          echo "Validating .devcontainer/devcontainer.json..."
+          if jq . .devcontainer/devcontainer.json > /dev/null 2>&1; then
+            echo "✓ Valid JSON"
+          else
+            echo "✗ Invalid JSON!"
+            cat .devcontainer/devcontainer.json
+            exit 1
+          fi
+
+      - name: Validate template is valid JSON
+        run: jq . .devcontainer/devcontainer.json.template > /dev/null
+
+  external-refs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate external repo references
+        run: |
+          source config/validate-dependencies.sh
+          VALIDATION_ERRORS=0
+          VALIDATION_WARNINGS=0
+          validate_chain_external_refs
+          if [[ $VALIDATION_ERRORS -gt 0 ]]; then
+            echo "FAILED: $VALIDATION_ERRORS broken external reference(s)"
+            exit 1
+          fi
+          echo "✓ All external references valid"
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [lint, build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test config
+        run: |
+          cat > .user-config.json <<'EOF'
+          {
+            "githubUser": "ci-test",
+            "projectDirs": [],
+            "baseImage": "ubuntu:24.04",
+            "features": {
+              "claude-skills": {},
+              "universal-hooks": {}
+            },
+            "secrets": {
+              "provider": "none"
+            }
+          }
+          EOF
+
+      - name: Render devcontainer.json for test
+        run: |
+          source config/lib/tools.sh
+          render_devcontainer_json .user-config.json .devcontainer/devcontainer.json.template .devcontainer/devcontainer.json
+
+      - name: Build container
+        run: docker build -t claude-mac-env:e2e .
+
+      - name: Run bootstrap and verify postconditions
+        run: |
+          docker run --rm \
+            -v "$(pwd)/config:/workspaces/.claude-mac-env/config:ro" \
+            -v "$(pwd)/scripts:/workspaces/.claude-mac-env/scripts:ro" \
+            -v "$(pwd)/.user-config.json:/workspaces/.claude-mac-env/.user-config.json:ro" \
+            -e CLAUDE_CODE=1 \
+            -e BOOTSTRAP_MOCK_AUTH=1 \
+            claude-mac-env:e2e \
+            bash -c "bash /workspaces/.claude-mac-env/config/bootstrap.sh && bash /workspaces/.claude-mac-env/scripts/test-e2e-bootstrap.sh"

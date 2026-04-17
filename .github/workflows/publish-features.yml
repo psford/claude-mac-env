@@ -28,3 +28,46 @@ jobs:
         with:
           publish-features: true
           base-path-to-features: ./features
+
+  verify:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify all Features are resolvable on GHCR
+        run: |
+          OWNER="psford"
+          REPO="claude-mac-env"
+          TAG="${GITHUB_REF_NAME}"
+          FEATURES=("claude-skills" "universal-hooks" "csharp-tools" "psford-personal")
+          FAILED=0
+
+          for feature in "${FEATURES[@]}"; do
+            IMAGE="ghcr.io/${OWNER}/${REPO}/${feature}:${TAG}"
+            echo "Verifying: ${IMAGE}"
+            if docker manifest inspect "${IMAGE}" > /dev/null 2>&1; then
+              echo "  ✓ ${feature}:${TAG} — manifest found"
+            else
+              echo "  ✗ ${feature}:${TAG} — manifest NOT found"
+              FAILED=$((FAILED + 1))
+            fi
+          done
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo ""
+            echo "ERROR: ${FAILED} Feature(s) failed manifest verification."
+            exit 1
+          fi
+
+          echo ""
+          echo "All ${#FEATURES[@]} Features verified on GHCR."

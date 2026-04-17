@@ -181,6 +181,42 @@ validate_chain_hooks() {
     fi
 }
 
+validate_chain_external_refs() {
+    echo ""
+    echo "=== External repo references ==="
+    echo "(checks that hardcoded GitHub repo URLs actually resolve)"
+
+    # Skip if gh is not authenticated
+    if ! command -v gh &>/dev/null || ! gh auth status &>/dev/null 2>&1; then
+        echo "  ⚠ gh not authenticated — skipping external ref validation"
+        VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
+        return 0
+    fi
+
+    # Known repo URLs used in the codebase
+    local repos=(
+        "ed3dai/ed3d-plugins"
+        "psford/claude-config"
+        "psford/claude-mac-env"
+    )
+
+    for repo in "${repos[@]}"; do
+        if timeout 10 gh repo view "$repo" --json name &>/dev/null 2>&1; then
+            echo "  ✓ $repo"
+        else
+            # In CI the default GITHUB_TOKEN can only access the current repo.
+            # Treat inaccessible external repos as warnings, not errors.
+            if [[ -n "${CI:-}" ]]; then
+                echo "  ⚠ $repo — inaccessible (expected in CI without cross-repo token)"
+                VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
+            else
+                echo "  ✗ $repo — NOT FOUND or inaccessible"
+                VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+            fi
+        fi
+    done
+}
+
 # ── Full validation ──────────────────────────────────────────────────────────
 
 validate_all() {
@@ -196,6 +232,7 @@ validate_all() {
     validate_chain_secrets
     validate_chain_skills
     validate_chain_hooks
+    validate_chain_external_refs
 
     echo ""
     echo "══════════════════════════════════════════════════════════"
