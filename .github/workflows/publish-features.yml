@@ -23,7 +23,8 @@ jobs:
 
       - name: Publish Features
         uses: devcontainers/action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           publish-features: true
           base-path-to-features: ./features
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
