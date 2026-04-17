@@ -6,7 +6,7 @@ set -e
 # Step 0: Validate ALL dependencies before doing anything
 # This exists because we once shipped a container with no gh, no az, and no
 # skills — the entire tooling layer was missing because nobody checked.
-REQUIRED_CMDS=("git" "claude" "gh")
+REQUIRED_CMDS=("git" "claude")
 MISSING=()
 for cmd in "${REQUIRED_CMDS[@]}"; do
     if ! command -v "$cmd" &>/dev/null; then
@@ -20,11 +20,10 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
     exit 1
 fi
 
-# Verify GitHub auth (needed for private repos)
-if ! gh auth status &>/dev/null 2>&1; then
-    echo "ERROR: gh is not authenticated. Cannot clone private skill repos."
-    echo "Run 'gh auth login' or ensure GITHUB_TOKEN is set before this Feature runs."
-    exit 1
+# If GITHUB_TOKEN is available (e.g. passed as a build secret), configure git to use it
+# for private repos. Without it, private repos will be skipped gracefully.
+if [ -n "${GITHUB_TOKEN}" ]; then
+    git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 fi
 
 # Use the remote user's home directory for skills installation

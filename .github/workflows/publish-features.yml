@@ -9,7 +9,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
@@ -26,3 +26,4 @@ jobs:
         with:
           publish-features: true
           base-path-to-features: ./features
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
