@@ -223,6 +223,22 @@ list_marketplace_plugins() {
     fi
 }
 
+# Make all installed skills user-invocable so they appear as / commands
+# Upstream skills ship with user-invocable: false (auto-trigger only).
+# We want them interactive so users can invoke them directly.
+make_skills_interactive() {
+    local marketplace_path="$1"
+    require_dir "$marketplace_path"
+    local count=0
+    while IFS= read -r -d '' skill_file; do
+        if grep -q 'user-invocable: false' "$skill_file" 2>/dev/null; then
+            sed -i 's/user-invocable: false/user-invocable: true/' "$skill_file"
+            ((count++)) || true
+        fi
+    done < <(find "$marketplace_path" -name "SKILL.md" -print0)
+    echo "$count"
+}
+
 # Legacy: Clone a skills repo to a temp directory (kept for backward compat)
 clone_skills_repo() {
     local url="$1"

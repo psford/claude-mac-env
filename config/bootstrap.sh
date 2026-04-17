@@ -265,6 +265,13 @@ step_install_plugins() {
         echo "  Installed ${count} ed3d plugins"
     fi
 
+    # Make all skills user-invocable (upstream defaults to false)
+    local patched
+    patched=$(make_skills_interactive "$marketplaces_dir/ed3d-plugins" 2>/dev/null) || true
+    if [ "${patched:-0}" -gt 0 ]; then
+        echo "  Patched ${patched} skills to be user-invocable"
+    fi
+
     # ── psford/claude-config (patricks-local marketplace) ────────────────
     local config_url="https://github.com/psford/claude-config.git"
     local config_path=""
@@ -295,6 +302,12 @@ step_install_plugins() {
             register_marketplace "patricks-local" 2>/dev/null || true
             enable_plugins "patricks-local" "patricks-workflow" 2>/dev/null || true
             echo "  Installed patricks-workflow plugin"
+
+            # Make patricks-local skills user-invocable too
+            patched=$(make_skills_interactive "$patricks_mkt" 2>/dev/null) || true
+            if [ "${patched:-0}" -gt 0 ]; then
+                echo "  Patched ${patched} patricks-local skills to be user-invocable"
+            fi
         fi
         # Clean up the full clone, keep only what we extracted
         rm -rf "$config_path"
