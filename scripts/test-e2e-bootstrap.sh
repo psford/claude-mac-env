@@ -28,19 +28,36 @@ check_fail() {
     ((CHECKS_FAILED++)) || true
 }
 
-# 1. Skills installed: $HOME/.claude/skills/ has > 0 directories
-skill_count=$(find "$HOME/.claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l) || true
-if [ "$skill_count" -gt 0 ]; then
-    check_pass "Skills installed ($skill_count skills)"
+# 1. Plugins installed: marketplace directory has plugin subdirectories
+marketplace_dir="$HOME/.claude/plugins/marketplaces/ed3d-plugins"
+plugin_count=$(find "$marketplace_dir/plugins" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l) || true
+if [ "$plugin_count" -gt 0 ]; then
+    check_pass "Plugins installed ($plugin_count plugins in ed3d-plugins marketplace)"
 else
-    check_fail "Skills installed" "$HOME/.claude/skills/ has no subdirectories"
+    check_fail "Plugins installed" "$marketplace_dir/plugins/ has no subdirectories"
 fi
 
-# 2. Known skill present
-if [ -f "$HOME/.claude/skills/brainstorming/SKILL.md" ]; then
+# 2. Known skill present via marketplace
+brainstorming_skill=$(find "$marketplace_dir" -path "*/brainstorming/SKILL.md" 2>/dev/null | head -1) || true
+if [ -n "$brainstorming_skill" ]; then
     check_pass "Known skill present (brainstorming)"
 else
-    check_fail "Known skill present (brainstorming)" "$HOME/.claude/skills/brainstorming/SKILL.md not found"
+    check_fail "Known skill present (brainstorming)" "brainstorming/SKILL.md not found in marketplace"
+fi
+
+# 2b. Plugins registered in settings.json
+if jq -e '.enabledPlugins["ed3d-plan-and-execute@ed3d-plugins"]' "$HOME/.claude/settings.json" >/dev/null 2>&1; then
+    check_pass "Plugins registered in settings.json"
+else
+    check_fail "Plugins registered in settings.json" "enabledPlugins missing ed3d-plan-and-execute@ed3d-plugins"
+fi
+
+# 2c. Skills are user-invocable
+non_invocable=$(grep -rl 'user-invocable: false' "$marketplace_dir" --include="SKILL.md" 2>/dev/null | wc -l) || true
+if [ "$non_invocable" -eq 0 ]; then
+    check_pass "All skills are user-invocable"
+else
+    check_fail "All skills are user-invocable" "$non_invocable skills still set to user-invocable: false"
 fi
 
 # 3. settings.json valid
