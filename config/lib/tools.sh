@@ -255,7 +255,8 @@ make_skills_interactive() {
     # and that cache copy — not the marketplace source — is what the CLI loads.
     # Patching only the source leaves the live skills stuck at user-invocable:false.
     local search_roots=("$marketplace_path")
-    local cache_root="${HOME}/.claude/plugins/cache/$(basename "$marketplace_path")"
+    local cache_root
+    cache_root="${HOME}/.claude/plugins/cache/$(basename "$marketplace_path")"
     if [ -d "$cache_root" ]; then
         search_roots+=("$cache_root")
     fi

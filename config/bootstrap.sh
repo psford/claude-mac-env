@@ -226,19 +226,29 @@ step_install_plugins() {
 
     local marketplaces_dir="${HOME}/.claude/plugins/marketplaces"
 
+    # The public ed3d marketplace is baked into the image at build time (see
+    # Dockerfile + config/install-ed3d-plugins.sh), so it is loaded before the
+    # first `claude` process starts — no reload needed. We only reach the install
+    # path below for the auth-gated private plugins, or to self-heal an image that
+    # somehow shipped without the bake.
+    #
     # Idempotency: only skip when a plugin is genuinely INSTALLED, not merely
     # enabled. Checking enabledPlugins alone treated the "enabled in settings.json
     # but never installed" zombie state as done, so the skills never appeared and
     # a re-run could not self-heal. installed_plugins.json is written only by
     # `claude plugin install`, so it is the authoritative signal.
+    local ed3d_ready=false
     if [ -d "$marketplaces_dir/ed3d-plugins/.claude-plugin" ] \
         && jq -e '.plugins["ed3d-plan-and-execute@ed3d-plugins"]' \
             "${HOME}/.claude/plugins/installed_plugins.json" >/dev/null 2>&1; then
-        step_skip "Plugins already installed"
-        return 0
+        step_skip "ed3d plugins present (baked into image)"
+        ed3d_ready=true
     fi
 
-    # ── ed3d-plugins marketplace ─────────────────────────────────────────
+    # ── ed3d-plugins marketplace (self-heal only) ────────────────────────
+    # Normally baked into the image, so this is skipped. It runs only if an
+    # image somehow shipped without the bake, restoring the plugins on disk.
+    if [ "$ed3d_ready" = false ]; then
     local ed3d_url="https://github.com/ed3dai/ed3d-plugins.git"
     local ed3d_path=""
     while true; do
@@ -276,10 +286,19 @@ step_install_plugins() {
     if [ "${patched:-0}" -gt 0 ]; then
         echo "  Patched ${patched} skills to be user-invocable"
     fi
+    fi  # end self-heal block
 
     # ── psford/claude-config (patricks-local marketplace) ────────────────
+    # These are private (auth-gated) so they cannot be baked at build time and
+    # must install here. Track whether they were freshly installed so we can warn
+    # that a window reload is needed for them to appear in the running session.
+    local private_freshly_installed=false
     local config_url="https://github.com/psford/claude-config.git"
     local config_path=""
+    if ! jq -e '.plugins["patricks-workflow@patricks-local"]' \
+        "${HOME}/.claude/plugins/installed_plugins.json" >/dev/null 2>&1; then
+        private_freshly_installed=true
+    fi
     if config_path=$(clone_repo "$config_url" "${HOME}/.claude/plugins/marketplaces/patricks-local-source" 2>/dev/null); then
         # The marketplace content is under plugins/patricks-workflow/ etc.
         # Copy the relevant plugin directories as a local marketplace
@@ -321,6 +340,18 @@ step_install_plugins() {
     fi
 
     step_done "Plugins installed and registered"
+
+    # The native binary loads plugins only at process startup. The ed3d skills are
+    # baked into the image so they are already live, but anything installed during
+    # this postCreate run (the private plugins, or a self-heal of ed3d) lands in a
+    # session that has already read its plugin list. `/reload-skills` does NOT
+    # reload plugins — only a full window reload does.
+    if [ "$private_freshly_installed" = true ] || [ "$ed3d_ready" = false ]; then
+        echo ""
+        echo "  ⚠  Some plugins were installed just now. To make them appear in this"
+        echo "     session, reload the window: Command Palette → 'Developer: Reload"
+        echo "     Window'. (/reload-skills does not reload plugins.)"
+    fi
 }
 
 step_clone_workspace_repos() {
