@@ -226,9 +226,14 @@ step_install_plugins() {
 
     local marketplaces_dir="${HOME}/.claude/plugins/marketplaces"
 
-    # Idempotency: check if marketplaces are already cloned and plugins enabled
+    # Idempotency: only skip when a plugin is genuinely INSTALLED, not merely
+    # enabled. Checking enabledPlugins alone treated the "enabled in settings.json
+    # but never installed" zombie state as done, so the skills never appeared and
+    # a re-run could not self-heal. installed_plugins.json is written only by
+    # `claude plugin install`, so it is the authoritative signal.
     if [ -d "$marketplaces_dir/ed3d-plugins/.claude-plugin" ] \
-        && jq -e '.enabledPlugins["ed3d-plan-and-execute@ed3d-plugins"]' "${HOME}/.claude/settings.json" >/dev/null 2>&1; then
+        && jq -e '.plugins["ed3d-plan-and-execute@ed3d-plugins"]' \
+            "${HOME}/.claude/plugins/installed_plugins.json" >/dev/null 2>&1; then
         step_skip "Plugins already installed"
         return 0
     fi
