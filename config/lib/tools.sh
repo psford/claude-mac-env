@@ -175,6 +175,14 @@ register_marketplace() {
     }
     echo "$updated" > "$settings_path"
     ensure_valid_json "$settings_path"
+
+    # Writing extraKnownMarketplaces only makes the marketplace *known*. The
+    # running CLI loads marketplaces from ~/.claude/plugins/known_marketplaces.json,
+    # which is written exclusively by `claude plugin marketplace add`. Without this
+    # the marketplace never actually registers and no plugins can install.
+    if command -v claude >/dev/null 2>&1; then
+        claude plugin marketplace add "$marketplace_path" >/dev/null 2>&1 || true
+    fi
 }
 
 # Enable plugins from a marketplace in settings.json
@@ -202,6 +210,17 @@ enable_plugins() {
     done
     echo "$updated" > "$settings_path"
     ensure_valid_json "$settings_path"
+
+    # enabledPlugins in settings.json only flips a plugin on once it is INSTALLED.
+    # The CLI loads plugins from ~/.claude/plugins/installed_plugins.json + the
+    # ~/.claude/plugins/cache/ copies, both written exclusively by
+    # `claude plugin install`. Enabling without installing is a silent no-op —
+    # this is why hand-written settings.json never surfaced the skills.
+    if command -v claude >/dev/null 2>&1; then
+        for plugin in "$@"; do
+            claude plugin install "${plugin}@${marketplace}" >/dev/null 2>&1 || true
+        done
+    fi
 }
 
 # List plugins available in a marketplace
@@ -230,12 +249,26 @@ make_skills_interactive() {
     local marketplace_path="$1"
     require_dir "$marketplace_path"
     local count=0
-    while IFS= read -r -d '' skill_file; do
-        if grep -q 'user-invocable: false' "$skill_file" 2>/dev/null; then
-            sed -i 's/user-invocable: false/user-invocable: true/' "$skill_file"
-            ((count++)) || true
-        fi
-    done < <(find "$marketplace_path" -name "SKILL.md" -print0)
+
+    # Patch the marketplace source AND the installed cache copies. `claude plugin
+    # install` copies each plugin into ~/.claude/plugins/cache/<marketplace>/...,
+    # and that cache copy — not the marketplace source — is what the CLI loads.
+    # Patching only the source leaves the live skills stuck at user-invocable:false.
+    local search_roots=("$marketplace_path")
+    local cache_root="${HOME}/.claude/plugins/cache/$(basename "$marketplace_path")"
+    if [ -d "$cache_root" ]; then
+        search_roots+=("$cache_root")
+    fi
+
+    local root
+    for root in "${search_roots[@]}"; do
+        while IFS= read -r -d '' skill_file; do
+            if grep -q 'user-invocable: false' "$skill_file" 2>/dev/null; then
+                sed -i 's/user-invocable: false/user-invocable: true/' "$skill_file"
+                ((count++)) || true
+            fi
+        done < <(find "$root" -name "SKILL.md" -print0)
+    done
     echo "$count"
 }
 
