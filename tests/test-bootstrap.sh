@@ -136,11 +136,24 @@ run_bootstrap() {
 
 echo "--- Idempotency (AC8) ---"
 
-# Pre-populate marketplace + enabledPlugins so step 4 skips
+# Pre-populate marketplace so step 4 recognizes ed3d
 mkdir -p "$MOCK_HOME/.claude/plugins/marketplaces/ed3d-plugins/.claude-plugin"
 echo '{"name":"ed3d-plugins","plugins":[]}' > "$MOCK_HOME/.claude/plugins/marketplaces/ed3d-plugins/.claude-plugin/marketplace.json"
 
-# Pre-populate settings.json with hooks AND enabledPlugins so steps 4+5 skip
+# Pre-populate installed_plugins.json so step 4 skips. The idempotency check reads
+# THIS file (written only by `claude plugin install`), not enabledPlugins — ed3d is
+# normally baked into the image, and the private plugin is treated as already done.
+cat > "$MOCK_HOME/.claude/plugins/installed_plugins.json" <<'INSTALLED_EOF'
+{
+  "version": 2,
+  "plugins": {
+    "ed3d-plan-and-execute@ed3d-plugins": [{"scope": "user", "version": "1.0.0"}],
+    "patricks-workflow@patricks-local": [{"scope": "user", "version": "1.0.0"}]
+  }
+}
+INSTALLED_EOF
+
+# Pre-populate settings.json with hooks so steps 5+ skip
 mkdir -p "$MOCK_HOME/.claude"
 cat > "$MOCK_HOME/.claude/settings.json" <<'SETTINGS_EOF'
 {
@@ -158,7 +171,7 @@ touch "$MOCK_HOME/.secrets.env"  # fallback if date -d not available
 config_file=$(create_config "testuser" "env")
 output=$(run_bootstrap "$config_file")
 
-assert_output_contains "Plugins already installed → skip (AC4.6)" "already installed" "$output"
+assert_output_contains "ed3d plugins present (baked) → skip (AC4.6)" "baked into image" "$output"
 assert_output_contains "Hooks already configured → skip (AC5.5)" "already configured" "$output"
 assert_output_contains "Secrets already loaded → skip (AC7.4)" "Secrets loaded" "$output"
 

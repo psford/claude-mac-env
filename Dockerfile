@@ -64,5 +64,14 @@ RUN chmod +x /usr/local/bin/detect-package-manager.sh
 USER ${USERNAME}
 WORKDIR /home/${USERNAME}
 
+# Bake the PUBLIC ed3d plugin marketplace into the image, as the claude user.
+# Plugins are loaded by the native binary only at process startup, so installing
+# them during postCreateCommand never surfaces in the already-running session.
+# Baking them here means installed_plugins.json + cache exist before the first
+# `claude` process starts — fresh regions get the skills with no manual reload.
+# (Auth-gated private plugins still install in config/bootstrap.sh.)
+COPY --chown=${USERNAME}:${USERNAME} config/install-ed3d-plugins.sh /tmp/install-ed3d-plugins.sh
+RUN bash /tmp/install-ed3d-plugins.sh && rm -f /tmp/install-ed3d-plugins.sh
+
 # Verify installations
 RUN node --version && npm --version && python3 --version && git --version && claude --version
