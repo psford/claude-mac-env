@@ -381,6 +381,7 @@ step_configure_claude() {
 {
   "permissions": {
     "allow": ["Bash(*)", "Read(*)", "Write(*)", "Edit(*)", "Glob(*)", "Grep(*)", "Agent(*)"],
+    "deny": ["Bash(gh pr merge*)"],
     "defaultMode": "bypassPermissions",
     "additionalDirectories": ["/home/claude/.claude"]
   },
@@ -400,6 +401,12 @@ step_configure_claude() {
             "command": "jq -r '.tool_input.command' | { read -r cmd; branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if echo \"$cmd\" | grep -qE 'git push' && echo \"$branch\" | grep -qE '^(main|master)$'; then echo '{\"decision\":\"block\",\"reason\":\"Cannot push directly to '\"$branch\"'. Create a PR instead.\"}'; else echo '{}'; fi; }",
             "if": "Bash(git push*)",
             "statusMessage": "Checking branch protection..."
+          },
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command' | { read -r cmd; if echo \"$cmd\" | grep -qE 'gh +pr +merge'; then echo '{\"decision\":\"block\",\"reason\":\"Merging PRs to main is disabled — that decision belongs to Patrick, not the agent. Leave the PR open for him to merge.\"}'; else echo '{}'; fi; }",
+            "if": "Bash(gh pr merge*)",
+            "statusMessage": "Checking PR-merge guard..."
           },
           {
             "type": "command",
